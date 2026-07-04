@@ -168,11 +168,26 @@ function migrate(d) {
   });
   return changed;
 }
+// When there's no KV but there IS a Blob store (typical Vercel setup here),
+// the whole database is stored as a single JSON object in Blob. Admin secrets
+// are stripped before writing, since the Blob store is public.
+const USE_BLOB_DB = USE_BLOB && !USE_KV;
+const BLOB_DB_PATH = 'data/trendyinus-db.json';
 async function readRawDB() {
   if (USE_KV) { try { return await kvCommand(['GET', 'db']); } catch (_e) { return null; } }
+  if (USE_BLOB_DB) {
+    try {
+      const listed = await blobApi.list({ prefix: BLOB_DB_PATH, token: process.env.BLOB_READ_WRITE_TOKEN });
+      const hit = (listed.blobs || []).find((b) => b.pathname === BLOB_DB_PATH) || (listed.blobs || [])[0];
+      if (!hit) return null;
+      const r = await fetch(hit.url + (hit.url.indexOf('?') === -1 ? '?' : '&') + 'cb=' + Date.now(), { cache: 'no-store' });
+      return await r.text();
+    } catch (_e) { return null; }
+  }
   try { return fs.readFileSync(DB_PATH, 'utf8'); } catch (_e) { return null; }
 }
 async function ensureDB() {
+  if (db) return; // load once; the object persists in memory for the process lifetime
   const raw = await readRawDB();
   let obj = null;
   try { obj = raw ? JSON.parse(raw) : null; } catch (_e) { obj = null; }
@@ -183,9 +198,13 @@ async function ensureDB() {
   if (fresh || changed) await saveDB();
 }
 async function saveDB() {
-  const s = JSON.stringify(db);
-  if (USE_KV) { try { await kvCommand(['SET', 'db', s]); } catch (_e) {} return; }
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DB_PATH, s); } catch (_e) {}
+  if (USE_KV) { try { await kvCommand(['SET', 'db', JSON.stringify(db)]); } catch (_e) {} return; }
+  if (USE_BLOB_DB) {
+    const persist = Object.assign({}, db); delete persist.admin; // never write admin creds to a public Blob
+    try { await blobApi.put(BLOB_DB_PATH, JSON.stringify(persist), { access: 'public', addRandomSuffix: false, contentType: 'application/json', cacheControlMaxAge: 0, allowOverwrite: true, token: process.env.BLOB_READ_WRITE_TOKEN }); } catch (_e) {}
+    return;
+  }
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DB_PATH, JSON.stringify(db)); } catch (_e) {}
 }
 
 /* ------------------------------------------------------------------ *
@@ -695,6 +714,28 @@ async function requestHandler(req, res) {
     if (!res.headersSent) sendJSON(res, code, { error: String(e && e.message || e) });
   }
 }
+
+// Ensure Vercel's file tracer (@vercel/nft) bundles the static files that
+// serveStatic reads at runtime — each literal path below is picked up statically.
+try {
+  fs.statSync(path.join(__dirname, 'index.html'));
+  fs.statSync(path.join(__dirname, 'admin.html'));
+  fs.statSync(path.join(__dirname, 'article.html'));
+  fs.statSync(path.join(__dirname, 'news.html'));
+  fs.statSync(path.join(__dirname, 'transfers.html'));
+  fs.statSync(path.join(__dirname, 'world-cup.html'));
+  fs.statSync(path.join(__dirname, 'leagues.html'));
+  fs.statSync(path.join(__dirname, 'features.html'));
+  fs.statSync(path.join(__dirname, 'live-scores.html'));
+  fs.statSync(path.join(__dirname, 'podcasts.html'));
+  fs.statSync(path.join(__dirname, 'page.html'));
+  fs.statSync(path.join(__dirname, 'assets/site.js'));
+  fs.statSync(path.join(__dirname, 'assets/admin.js'));
+  fs.statSync(path.join(__dirname, 'assets/theme.css'));
+  fs.statSync(path.join(__dirname, 'assets/tw-config.js'));
+  fs.statSync(path.join(__dirname, 'assets/logo.svg'));
+  fs.statSync(path.join(__dirname, 'assets/favicon.svg'));
+} catch (_e) {}
 
 module.exports = requestHandler;
 
