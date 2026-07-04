@@ -1,0 +1,13 @@
+{
+  "name": "trendyinus-news",
+  "version": "1.0.0",
+  "description": "TrendyinUS football news portal + CMS (zero-dependency Node server)",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}

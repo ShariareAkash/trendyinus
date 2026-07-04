@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 400" width="980" height="400" font-family="'Archivo Narrow','Arial Narrow',Arial,sans-serif">
+  <!-- Flag -->
+  <rect x="15" y="30" width="150" height="145" fill="#1f2a6d"/>
+  <polygon points="90,46 103.5,85 145,86 112,111 124,150 90,127 56,150 68,111 35,86 76.5,85" fill="#fff"/>
+  <rect x="195" y="40" width="215" height="40" rx="4" fill="#cc2028"/>
+  <rect x="195" y="120" width="215" height="40" rx="4" fill="#cc2028"/>
+  <rect x="15" y="205" width="430" height="40" rx="4" fill="#cc2028"/>
+  <rect x="15" y="270" width="430" height="40" rx="4" fill="#cc2028"/>
+  <rect x="15" y="335" width="300" height="40" rx="4" fill="#cc2028"/>
+  <!-- Wordmark -->
+  <text x="470" y="290" font-size="285" font-weight="800" fill="#1f2a6d" letter-spacing="-6" style="font-stretch:condensed">US</text>
+  <rect x="560" y="300" width="60" height="12" fill="#cc2028"/>
+  <text x="558" y="392" font-size="120" font-weight="700" fill="#cc2028" letter-spacing="1">TRENDY</text>
+</svg>

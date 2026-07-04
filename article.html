@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"/>
+<title>Article — TrendyinUS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600;700&amp;family=Inter:wght@400;600;700;900&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="/assets/tw-config.js"></script>
+<link rel="stylesheet" href="/assets/theme.css"/>
+</head>
+<body class="bg-surface-bright text-on-surface font-body-md selection:bg-primary-container selection:text-on-primary-container">
+<div id="site-header"></div>
+<main class="max-w-container-max mx-auto px-gutter py-stack-lg">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left rail -->
+<aside class="hidden lg:block lg:col-span-2 sticky top-24 h-fit">
+<div class="flex flex-col gap-stack-md p-stack-md bg-surface-container-low rounded-xl border border-outline-variant shadow-sm">
+<div class="mb-4"><h3 class="font-headline-md text-headline-md font-bold text-on-surface">TrendyinUS</h3><p class="font-body-md text-label-sm text-on-surface-variant">Football Daily</p></div>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-all duration-300" href="index.html"><span class="material-symbols-outlined">home</span><span class="font-label-sm">Home</span></a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-all duration-300" href="live-scores.html"><span class="material-symbols-outlined">sports_soccer</span><span class="font-label-sm">Live Scores</span></a>
+<a class="flex items-center gap-3 p-3 bg-primary-container text-on-primary-container rounded-lg font-bold transition-all duration-300" href="leagues.html"><span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">emoji_events</span><span class="font-label-sm">Champions League</span></a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-all duration-300" href="transfers.html"><span class="material-symbols-outlined">article</span><span class="font-label-sm">Transfer News</span></a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-all duration-300" href="admin.html"><span class="material-symbols-outlined">settings</span><span class="font-label-sm">Admin</span></a>
+</div>
+<div class="mt-stack-lg p-stack-md border border-outline-variant rounded-xl bg-card">
+<div class="flex items-center gap-2 mb-3"><div class="w-2 h-2 rounded-full bg-primary pulse-dot"></div><span class="font-label-sm text-on-surface font-bold">LIVE MATCH</span></div>
+<div class="space-y-4">
+<div class="flex justify-between items-center"><span id="a-live-home" class="font-label-sm text-on-surface-variant"></span><span id="a-live-home-score" class="font-label-sm font-bold text-on-surface"></span></div>
+<div class="flex justify-between items-center"><span id="a-live-away" class="font-label-sm text-on-surface-variant"></span><span id="a-live-away-score" class="font-label-sm font-bold text-on-surface"></span></div>
+<div class="text-center pt-2 border-t border-outline-variant"><span id="a-live-status" class="font-label-sm text-primary font-bold"></span></div>
+</div>
+</div>
+</aside>
+<!-- Article -->
+<article class="lg:col-span-10 xl:col-span-7">
+<div class="flex flex-wrap items-center gap-4 mb-stack-md">
+<span id="a-category" class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full font-label-sm text-xs font-bold uppercase tracking-wider"></span>
+<span id="a-meta" class="font-label-sm text-on-surface-variant"></span>
+</div>
+<h1 id="a-title" class="font-headline-xl text-headline-xl mb-stack-md leading-[1.1] tracking-tight text-on-surface"></h1>
+<div class="relative w-full aspect-video rounded-xl overflow-hidden mb-stack-lg border border-outline-variant shadow-md">
+<img id="a-image" class="w-full h-full object-cover" alt="" src=""/>
+<div class="absolute bottom-0 left-0 w-full p-stack-md article-gradient"><p id="a-caption" class="font-label-sm text-white/90 italic text-sm"></p></div>
+</div>
+<div class="flex items-center gap-4 mb-stack-lg p-4 bg-surface-container rounded-xl border border-outline-variant">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant"><img id="a-avatar" class="w-full h-full object-cover" alt="" src=""/></div>
+<div><p id="a-author" class="font-label-sm text-on-surface font-bold"></p><p id="a-author-role" class="font-label-sm text-on-surface-variant"></p></div>
+<div class="ml-auto flex gap-2">
+<button onclick="navigator.share ? navigator.share({title:document.title,url:location.href}) : (navigator.clipboard.writeText(location.href), alert('Link copied'))" class="p-2 rounded-full border border-outline-variant hover:bg-surface-variant transition-colors text-on-surface"><span class="material-symbols-outlined text-[20px]">share</span></button>
+<button onclick="alert('Saved to your reading list')" class="p-2 rounded-full border border-outline-variant hover:bg-surface-variant transition-colors text-on-surface"><span class="material-symbols-outlined text-[20px]">bookmark</span></button>
+</div>
+</div>
+<div id="a-body" class="font-body-lg text-body-lg text-on-surface space-y-6 max-w-[800px] mx-auto"></div>
+<div id="a-tags" class="mt-stack-lg pt-stack-md border-t border-outline-variant flex gap-2 flex-wrap"></div>
+</article>
+<!-- Right sidebar -->
+<aside class="lg:col-span-12 xl:col-span-3 space-y-stack-lg">
+<div>
+<h3 class="font-headline-md text-headline-md font-bold mb-stack-md flex items-center gap-2 text-on-surface">Trending Football<div class="h-px flex-grow bg-outline-variant"></div></h3>
+<div id="a-trending" class="space-y-6"></div>
+</div>
+<div class="bg-surface-container-high p-stack-md rounded-xl border border-primary/20">
+<span class="font-label-sm text-primary font-bold mb-2 block uppercase tracking-tighter">Stay Updated</span>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-3">Football Daily Digest</h4>
+<p class="font-body-md text-sm text-on-surface-variant mb-4">Get the latest transfer rumors, match reports, and tactical analysis in your inbox.</p>
+<form class="space-y-3" onsubmit="return TI.subscribe(event)"><input required class="w-full bg-card border border-outline-variant rounded-lg px-4 py-2 text-on-surface focus:ring-1 focus:ring-primary" placeholder="Email address" type="email"/><button class="w-full bg-primary-container text-on-primary-container py-3 rounded-lg font-bold font-label-sm hover:brightness-105 transition-all">Sign Up Now</button></form>
+</div>
+</aside>
+</div>
+</main>
+<!-- More news (dynamic) -->
+<section class="max-w-container-max mx-auto px-gutter py-stack-lg">
+<div class="flex justify-between items-center mb-stack-md">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">More Football News</h2>
+<a class="font-label-sm text-primary flex items-center gap-1 hover:underline font-bold" href="news.html">Show More <span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+</div>
+<div id="a-more" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter"></div>
+</section>
+<div id="site-footer"></div>
+<div class="fixed bottom-8 right-8 z-40 hidden lg:block">
+<a href="live-scores.html" class="bg-primary text-on-primary flex items-center gap-2 px-6 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-transform"><div class="w-2 h-2 rounded-full bg-white pulse-dot"></div><span class="font-label-sm font-bold">LIVE MATCH CENTRE</span></a>
+</div>
+<script>window.TI_PAGE = { type: 'article', active: '' };</script>
+<script src="/assets/site.js"></script>
+</body>
+</html>

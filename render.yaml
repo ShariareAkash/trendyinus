@@ -1,0 +1,23 @@
+# Render.com blueprint — deploys the TrendyinUS Node server.
+# In Render: New +  ->  Blueprint  ->  connect the repo containing this file.
+services:
+  - type: web
+    name: trendyinus
+    runtime: node
+    plan: free
+    buildCommand: ""          # zero dependencies, nothing to build
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: ADMIN_USERNAME
+        sync: false            # set to: ShariareAkash
+      - key: ADMIN_PASSWORD
+        sync: false            # set to your password (used only for a fresh database)
+      # --- Optional: uncomment BOTH the env var and the disk below on a paid
+      # --- instance to make posts/uploads permanent across restarts. ---
+      # - key: DATA_DIR
+      #   value: /var/data
+    # disk:
+    #   name: data
+    #   mountPath: /var/data
+    #   sizeGB: 1

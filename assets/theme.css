@@ -1,0 +1,105 @@
+/* TrendyinUS "Velocity Grid" — unified light/dark theme via CSS variables.
+   Colours are stored as raw "R G B" channels so Tailwind's /opacity
+   modifiers (e.g. border-primary/20) keep working. */
+:root {
+  --background: 255 255 255;
+  --on-background: 26 26 26;
+  --surface: 255 255 255;
+  --surface-bright: 255 255 255;
+  --surface-dim: 243 244 246;
+  --surface-variant: 243 244 246;
+  --surface-container: 243 244 246;
+  --surface-container-low: 249 250 251;
+  --surface-container-lowest: 255 255 255;
+  --surface-container-high: 229 231 235;
+  --surface-container-highest: 209 213 219;
+  --on-surface: 26 26 26;
+  --on-surface-variant: 75 85 99;
+  --primary: 0 230 57;
+  --on-primary: 255 255 255;
+  --primary-container: 0 255 65;
+  --on-primary-container: 0 57 7;
+  --primary-fixed: 0 230 57;
+  --primary-fixed-dim: 0 200 50;
+  --secondary: 75 85 99;
+  --secondary-container: 243 244 246;
+  --on-secondary: 255 255 255;
+  --on-secondary-container: 31 41 55;
+  --tertiary: 17 24 39;
+  --on-tertiary: 255 255 255;
+  --outline: 209 213 219;
+  --outline-variant: 229 231 235;
+  --error: 220 38 38;
+  --on-error: 255 255 255;
+  --error-container: 254 226 226;
+  --on-error-container: 65 0 2;
+  --inverse-surface: 26 26 26;
+  --inverse-on-surface: 245 245 245;
+  --inverse-primary: 0 255 65;
+  --surface-tint: 0 230 57;
+  --card: 255 255 255;
+}
+.dark {
+  --background: 19 19 19;
+  --on-background: 229 226 225;
+  --surface: 19 19 19;
+  --surface-bright: 57 57 57;
+  --surface-dim: 19 19 19;
+  --surface-variant: 53 53 52;
+  --surface-container: 32 31 31;
+  --surface-container-low: 28 27 27;
+  --surface-container-lowest: 14 14 14;
+  --surface-container-high: 42 42 42;
+  --surface-container-highest: 53 53 52;
+  --on-surface: 229 226 225;
+  --on-surface-variant: 185 204 178;
+  --primary: 0 255 65;
+  --on-primary: 0 57 7;
+  --primary-container: 0 255 65;
+  --on-primary-container: 0 57 7;
+  --primary-fixed: 114 255 112;
+  --primary-fixed-dim: 0 230 57;
+  --secondary: 200 198 199;
+  --secondary-container: 73 73 74;
+  --on-secondary: 48 48 49;
+  --on-secondary-container: 186 184 185;
+  --tertiary: 249 249 249;
+  --on-tertiary: 47 49 49;
+  --outline: 132 150 126;
+  --outline-variant: 59 75 55;
+  --error: 255 180 171;
+  --on-error: 105 0 5;
+  --error-container: 147 0 10;
+  --on-error-container: 255 218 214;
+  --inverse-surface: 229 226 225;
+  --inverse-on-surface: 49 48 48;
+  --inverse-primary: 0 110 22;
+  --surface-tint: 0 230 57;
+  --card: 32 31 31;
+}
+
+html { scroll-behavior: smooth; }
+body { transition: background-color .3s ease, color .3s ease; }
+
+@keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+.pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+.article-gradient { background-image: linear-gradient(to top, rgb(var(--background) / .92), transparent); }
+
+.bento-card { transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease; }
+.bento-card:hover { transform: translateY(-4px); }
+
+.clickable { cursor: pointer; }
+
+/* Simple fade-in for JS-rendered content */
+@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fadein { animation: fadein .4s ease both; }
+
+/* Breaking-news ticker */
+.ticker-wrap { overflow: hidden; position: relative; display: flex; align-items: center; }
+.ticker-track { display: inline-flex; align-items: center; white-space: nowrap; padding: 8px 0; will-change: transform; animation: ticker 75s linear infinite; }
+.ticker-wrap:hover .ticker-track { animation-play-state: paused; }
+.ticker-item { display: inline-block; font-size: 13px; padding: 0 4px; }
+.ticker-item:hover { text-decoration: underline; }
+.ticker-sep { color: rgb(var(--primary)); margin: 0 16px; font-weight: 900; }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }

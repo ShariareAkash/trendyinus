@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"/>
+<title>Admin — TrendyinUS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600;700&amp;family=Inter:wght@400;600;700;900&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="/assets/tw-config.js"></script>
+<link rel="stylesheet" href="/assets/theme.css"/>
+<style>
+  .ad-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:rgb(var(--on-surface-variant));margin-bottom:4px;}
+  .ad-input{width:100%;background:rgb(var(--card));border:1px solid rgb(var(--outline-variant));border-radius:.5rem;padding:.55rem .75rem;color:rgb(var(--on-surface));outline:none;font-size:14px;}
+  .ad-input:focus{box-shadow:0 0 0 2px rgb(var(--primary));border-color:transparent;}
+  .wp-item{display:flex;align-items:center;gap:12px;padding:10px 16px;color:#c3c4c7;cursor:pointer;border-left:3px solid transparent;font-weight:600;font-size:14px;}
+  .wp-item:hover{background:#2c3338;color:#72aee6;}
+  .wp-item.active{background:#2c3338;color:#fff;border-left-color:#00e639;}
+  .wp-item .material-symbols-outlined{font-size:20px;}
+  /* Rich text editor */
+  .rte-tb{display:flex;flex-wrap:wrap;gap:2px;padding:6px;background:rgb(var(--surface-container));border-bottom:1px solid rgb(var(--outline-variant));}
+  .rte-tb button{width:34px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:rgb(var(--on-surface-variant));background:transparent;border:none;cursor:pointer;font-weight:700;}
+  .rte-tb button:hover{background:rgb(var(--surface-container-high));color:rgb(var(--on-surface));}
+  .rte-tb .sep{width:1px;background:rgb(var(--outline-variant));margin:2px 4px;}
+  .rte-area{min-height:360px;padding:16px 20px;outline:none;color:rgb(var(--on-surface));font-family:'Source Serif 4',serif;font-size:17px;line-height:1.7;background:rgb(var(--card));}
+  .rte-area:focus{box-shadow:inset 0 0 0 2px rgb(var(--primary));}
+  .rte-area h2{font-family:'Archivo Narrow';font-size:28px;font-weight:700;margin:.6em 0 .3em;}
+  .rte-area h3{font-family:'Archivo Narrow';font-size:22px;font-weight:700;margin:.6em 0 .3em;}
+  .rte-area p{margin:.6em 0;}
+  .rte-area ul{list-style:disc;padding-left:1.4em;margin:.6em 0;}
+  .rte-area ol{list-style:decimal;padding-left:1.4em;margin:.6em 0;}
+  .rte-area blockquote{border-left:4px solid rgb(var(--primary));padding-left:1em;color:rgb(var(--on-surface-variant));font-style:italic;margin:.8em 0;}
+  .rte-area a{color:rgb(var(--primary));text-decoration:underline;}
+  .rte-area img{max-width:100%;border-radius:8px;margin:.5em 0;}
+  .rte-area:empty:before{content:attr(data-ph);color:rgb(var(--on-surface-variant));opacity:.6;}
+  .wp-box{background:rgb(var(--card));border:1px solid rgb(var(--outline-variant));border-radius:10px;}
+  .wp-box-h{padding:10px 14px;border-bottom:1px solid rgb(var(--outline-variant));font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:rgb(var(--on-surface));}
+  .row-actions{opacity:0;transition:opacity .15s;}
+  .wp-row:hover .row-actions{opacity:1;}
+</style>
+</head>
+<body class="bg-surface-container-low text-on-background font-label-sm min-h-screen">
+
+<!-- LOGIN -->
+<div id="login-view" class="min-h-screen flex items-center justify-center px-gutter">
+<form id="login-form" class="w-full max-w-md bg-card border border-outline-variant rounded-2xl shadow-xl p-8 space-y-5">
+<div class="text-center mb-2"><img src="/assets/logo.svg" alt="TrendyinUS" class="h-12 mx-auto mb-3"/><p class="text-on-surface-variant text-label-sm uppercase tracking-widest font-bold">Admin Console</p></div>
+<div><label class="block text-label-sm font-bold text-on-surface-variant mb-1 uppercase tracking-wide">Username</label><input id="login-user" required autocomplete="username" class="w-full bg-surface-container border border-outline-variant rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-primary outline-none" type="text"/></div>
+<div><label class="block text-label-sm font-bold text-on-surface-variant mb-1 uppercase tracking-wide">Password</label><input id="login-pass" required autocomplete="current-password" class="w-full bg-surface-container border border-outline-variant rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-primary outline-none" type="password"/></div>
+<p id="login-error" class="text-error text-sm hidden"></p>
+<button class="w-full bg-primary text-on-primary py-3 rounded-lg font-black uppercase tracking-wide hover:brightness-105 active:scale-95 transition">Sign In</button>
+</form>
+</div>
+
+<!-- ADMIN APP -->
+<div id="admin-view" class="hidden min-h-screen flex">
+<!-- Sidebar -->
+<aside id="wp-sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-60 shrink-0 bg-[#1d2327] flex flex-col -translate-x-full lg:translate-x-0 transition-transform">
+<div class="h-16 flex items-center gap-2 px-4 border-b border-white/10"><img src="/assets/logo.svg" class="h-7 bg-white rounded px-1.5 py-0.5"/><span class="text-white/50 text-[11px] uppercase font-bold tracking-widest">Admin</span></div>
+<nav class="flex-1 py-2 overflow-y-auto">
+<div class="wp-item active" data-screen="dashboard"><span class="material-symbols-outlined">dashboard</span>Dashboard</div>
+<div class="wp-item" data-screen="posts"><span class="material-symbols-outlined">push_pin</span>Posts</div>
+<div class="wp-item pl-12 text-[13px]" data-screen="editor" data-new="1"><span class="material-symbols-outlined text-[16px]">add</span>Add New Post</div>
+<div class="wp-item pl-12 text-[13px]" data-screen="categories"><span class="material-symbols-outlined text-[16px]">sell</span>Categories</div>
+<div class="wp-item" data-screen="pages"><span class="material-symbols-outlined">description</span>Pages</div>
+<div class="wp-item" data-screen="media"><span class="material-symbols-outlined">photo_library</span>Media</div>
+<div class="wp-item" data-screen="menu"><span class="material-symbols-outlined">menu</span>Menu</div>
+<div class="wp-item" data-screen="settings"><span class="material-symbols-outlined">tune</span>Settings</div>
+<div class="wp-item" data-screen="account"><span class="material-symbols-outlined">manage_accounts</span>Account</div>
+</nav>
+<a href="index.html" target="_blank" class="wp-item border-t border-white/10"><span class="material-symbols-outlined">open_in_new</span>Visit Site</a>
+</aside>
+<div id="sidebar-scrim" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden"></div>
+
+<!-- Main -->
+<div class="flex-1 min-w-0 flex flex-col">
+<header class="h-16 bg-card border-b border-outline-variant flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-3">
+<button id="sidebar-toggle" class="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant"><span class="material-symbols-outlined">menu</span></button>
+<h1 id="screen-title" class="font-headline-md text-xl font-bold text-on-background">Dashboard</h1>
+</div>
+<div class="flex items-center gap-2">
+<button id="admin-theme" title="Toggle theme" class="w-9 h-9 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:text-primary transition"><span class="material-symbols-outlined text-[20px]">dark_mode</span></button>
+<span class="hidden sm:inline text-on-surface-variant text-sm">Howdy, <b id="whoami" class="text-on-surface">admin</b></span>
+<button id="logout-btn" class="flex items-center gap-1 px-3 py-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition"><span class="material-symbols-outlined text-[18px]">logout</span><span class="text-xs font-bold hidden sm:inline">Logout</span></button>
+</div>
+</header>
+
+<main class="flex-1 p-4 md:p-6 max-w-6xl w-full mx-auto">
+
+<!-- DASHBOARD -->
+<section data-panel="dashboard">
+<div id="dash-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<div class="wp-box"><div class="wp-box-h">Recent Posts</div><div id="dash-recent" class="divide-y divide-outline-variant"></div></div>
+<div class="wp-box"><div class="wp-box-h">Quick Actions</div><div class="p-4 grid grid-cols-2 gap-3">
+<button class="quick-new flex items-center gap-2 p-3 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-bold"><span class="material-symbols-outlined text-primary">add_circle</span>New Post</button>
+<button data-goto="categories" class="dash-link flex items-center gap-2 p-3 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-bold"><span class="material-symbols-outlined text-primary">sell</span>Categories</button>
+<button data-goto="pages" class="dash-link flex items-center gap-2 p-3 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-bold"><span class="material-symbols-outlined text-primary">description</span>Pages</button>
+<button data-goto="settings" class="dash-link flex items-center gap-2 p-3 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-bold"><span class="material-symbols-outlined text-primary">tune</span>Settings</button>
+</div></div>
+</div>
+</section>
+
+<!-- POSTS LIST -->
+<section data-panel="posts" class="hidden">
+<div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+<button class="quick-new flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold hover:brightness-105 active:scale-95 transition"><span class="material-symbols-outlined text-[20px]">add</span> Add New Post</button>
+<input id="posts-search" placeholder="Search posts…" class="ad-input max-w-xs"/>
+</div>
+<div class="wp-box overflow-hidden">
+<div class="hidden md:grid grid-cols-[1fr_140px_150px_120px] gap-2 px-4 py-2.5 bg-surface-container text-[11px] font-black uppercase tracking-wide text-on-surface-variant border-b border-outline-variant"><span>Title</span><span>Author</span><span>Category</span><span>Date</span></div>
+<div id="posts-list"></div>
+</div>
+</section>
+
+<!-- POST EDITOR -->
+<section data-panel="editor" class="hidden">
+<form id="post-form">
+<input type="hidden" name="id"/>
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+<div class="space-y-4">
+<input name="title" required placeholder="Add title" class="w-full bg-card border border-outline-variant rounded-lg px-4 py-3 text-3xl font-headline-md font-bold text-on-surface focus:ring-2 focus:ring-primary outline-none"/>
+<p class="text-xs text-on-surface-variant">Permalink: <span class="text-primary" id="pe-permalink">/article.html?id=(new)</span></p>
+<div class="border border-outline-variant rounded-lg overflow-hidden bg-card">
+<div class="rte-tb" id="rte-toolbar">
+<button type="button" data-cmd="formatBlock" data-val="p" title="Paragraph">P</button>
+<button type="button" data-cmd="formatBlock" data-val="h2" title="Heading 2">H2</button>
+<button type="button" data-cmd="formatBlock" data-val="h3" title="Heading 3">H3</button>
+<span class="sep"></span>
+<button type="button" data-cmd="bold" title="Bold"><span class="material-symbols-outlined text-[20px]">format_bold</span></button>
+<button type="button" data-cmd="italic" title="Italic"><span class="material-symbols-outlined text-[20px]">format_italic</span></button>
+<button type="button" data-cmd="underline" title="Underline"><span class="material-symbols-outlined text-[20px]">format_underlined</span></button>
+<button type="button" data-cmd="strikeThrough" title="Strikethrough"><span class="material-symbols-outlined text-[20px]">strikethrough_s</span></button>
+<span class="sep"></span>
+<button type="button" data-cmd="insertUnorderedList" title="Bulleted list"><span class="material-symbols-outlined text-[20px]">format_list_bulleted</span></button>
+<button type="button" data-cmd="insertOrderedList" title="Numbered list"><span class="material-symbols-outlined text-[20px]">format_list_numbered</span></button>
+<button type="button" data-cmd="formatBlock" data-val="blockquote" title="Quote"><span class="material-symbols-outlined text-[20px]">format_quote</span></button>
+<span class="sep"></span>
+<button type="button" data-cmd="justifyLeft" title="Align left"><span class="material-symbols-outlined text-[20px]">format_align_left</span></button>
+<button type="button" data-cmd="justifyCenter" title="Align center"><span class="material-symbols-outlined text-[20px]">format_align_center</span></button>
+<span class="sep"></span>
+<button type="button" id="rte-link" title="Insert link"><span class="material-symbols-outlined text-[20px]">link</span></button>
+<button type="button" id="rte-image" title="Insert image"><span class="material-symbols-outlined text-[20px]">image</span></button>
+<button type="button" data-cmd="removeFormat" title="Clear formatting"><span class="material-symbols-outlined text-[20px]">format_clear</span></button>
+<span class="sep"></span>
+<button type="button" id="rte-code" title="Edit HTML" class="text-xs">&lt;/&gt;</button>
+</div>
+<div id="rte-body" class="rte-area" contenteditable="true" data-ph="Write your story…"></div>
+<textarea id="rte-html" class="hidden w-full p-4 font-mono text-sm bg-card text-on-surface outline-none" style="min-height:360px;"></textarea>
+</div>
+<div class="wp-box"><div class="wp-box-h">Excerpt</div><div class="p-3"><textarea name="excerpt" rows="2" class="ad-input" placeholder="Short summary shown on cards…"></textarea></div></div>
+<div class="wp-box"><div class="wp-box-h">Article Image Caption</div><div class="p-3"><input name="caption" class="ad-input" placeholder="Photo credit / caption"/></div></div>
+</div>
+
+<!-- Sidebar boxes -->
+<div class="space-y-4">
+<div class="wp-box"><div class="wp-box-h flex items-center justify-between">Publish</div>
+<div class="p-3 space-y-3">
+<div><label class="ad-label">Status</label><select name="status" class="ad-input py-1"><option value="published">Published</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option></select></div>
+<div><label class="ad-label" id="pe-date-label">Date</label><input name="date" type="date" class="ad-input py-1"/></div>
+<div class="flex flex-wrap gap-4 text-sm py-1">
+<label class="flex items-center gap-1.5"><input name="featured" type="checkbox" class="w-4 h-4 rounded text-primary"/>Featured</label>
+<label class="flex items-center gap-1.5"><input name="highlight" type="checkbox" class="w-4 h-4 rounded text-primary"/>Highlight</label>
+<label class="flex items-center gap-1.5"><input name="trending" type="checkbox" class="w-4 h-4 rounded text-primary"/>Trending</label>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant">
+<button type="button" id="editor-delete" class="hidden text-error text-sm font-bold hover:underline">Move to Trash</button>
+<div class="flex gap-2 ml-auto">
+<button type="button" id="editor-preview" class="px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant text-sm font-bold hover:bg-surface-container">Preview</button>
+<button class="px-5 py-2 rounded-lg bg-primary text-on-primary font-black uppercase text-xs tracking-wide hover:brightness-105 active:scale-95 transition"><span id="publish-label">Publish</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="wp-box"><div class="wp-box-h">Section</div><div class="p-3">
+<select name="section" class="ad-input">
+<option value="news">News</option><option value="transfers">Transfers</option><option value="world-cup">World Cup</option><option value="leagues">Leagues</option><option value="features">Features</option><option value="live-scores">Live Scores</option>
+</select></div></div>
+<div class="wp-box"><div class="wp-box-h">Categories</div><div class="p-3">
+<div id="cat-checklist" class="max-h-44 overflow-y-auto space-y-1.5 mb-2"></div>
+<div class="flex gap-1"><input id="cat-quick" class="ad-input py-1 text-sm" placeholder="New category"/><button type="button" id="cat-quick-add" class="px-2 rounded-lg border border-outline-variant text-primary text-sm font-bold">Add</button></div>
+</div></div>
+<div class="wp-box"><div class="wp-box-h">Featured Image</div><div class="p-3">
+<img id="pe-image-preview" class="w-full h-32 object-cover rounded-lg border border-outline-variant mb-2 hidden"/>
+<input name="image" class="ad-input mb-2" placeholder="Image URL"/>
+<label class="cursor-pointer inline-flex items-center gap-1 text-primary text-sm font-bold"><span class="material-symbols-outlined text-[18px]">upload</span>Upload / Set image<input type="file" accept="image/*" class="hidden" data-upload="image"/></label>
+</div></div>
+<div class="wp-box"><div class="wp-box-h">Author</div><div class="p-3 space-y-2">
+<input name="author" class="ad-input" placeholder="Author name"/>
+<input name="authorRole" class="ad-input" placeholder="Role e.g. Correspondent"/>
+<input name="readTime" type="number" min="1" class="ad-input" placeholder="Read time (min)"/>
+<div class="flex items-center gap-2"><img id="pe-avatar-preview" class="w-9 h-9 rounded-full object-cover border border-outline-variant hidden"/><label class="cursor-pointer inline-flex items-center gap-1 text-primary text-sm font-bold"><span class="material-symbols-outlined text-[18px]">upload</span>Avatar<input type="file" accept="image/*" class="hidden" data-upload="authorAvatar"/></label></div>
+<input name="authorAvatar" class="ad-input" placeholder="Avatar URL"/>
+</div></div>
+<div class="wp-box"><div class="wp-box-h">Tags</div><div class="p-3"><input name="tags" class="ad-input" placeholder="#UCL, #Football"/></div></div>
+</div>
+</div>
+</form>
+</section>
+
+<!-- CATEGORIES -->
+<section data-panel="categories" class="hidden">
+<div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
+<div class="wp-box"><div class="wp-box-h" id="cat-form-title">Add New Category</div>
+<form id="cat-form" class="p-4 space-y-3">
+<input type="hidden" name="id"/>
+<div><label class="ad-label">Name</label><input name="name" required class="ad-input"/></div>
+<div><label class="ad-label">Slug</label><input name="slug" class="ad-input" placeholder="auto from name"/></div>
+<div class="flex gap-2"><button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold text-sm" id="cat-submit">Add Category</button><button type="button" id="cat-cancel" class="hidden px-4 py-2 rounded-lg border border-outline-variant text-sm font-bold">Cancel</button></div>
+</form>
+</div>
+<div class="wp-box overflow-hidden">
+<div class="grid grid-cols-[1fr_1fr_80px] gap-2 px-4 py-2.5 bg-surface-container text-[11px] font-black uppercase text-on-surface-variant border-b border-outline-variant"><span>Name</span><span>Slug</span><span>Posts</span></div>
+<div id="cat-list"></div>
+</div>
+</div>
+</section>
+
+<!-- PAGES LIST -->
+<section data-panel="pages" class="hidden">
+<div class="flex items-center justify-between mb-4"><button id="page-new" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold"><span class="material-symbols-outlined text-[20px]">add</span> Add New Page</button></div>
+<div class="wp-box overflow-hidden">
+<div class="grid grid-cols-[1fr_160px_90px] gap-2 px-4 py-2.5 bg-surface-container text-[11px] font-black uppercase text-on-surface-variant border-b border-outline-variant"><span>Title</span><span>Slug</span><span>Footer</span></div>
+<div id="pages-list"></div>
+</div>
+</section>
+
+<!-- PAGE EDITOR -->
+<section data-panel="page-editor" class="hidden">
+<form id="page-form">
+<input type="hidden" name="id"/>
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
+<div class="space-y-4">
+<input name="title" required placeholder="Page title" class="w-full bg-card border border-outline-variant rounded-lg px-4 py-3 text-2xl font-headline-md font-bold text-on-surface focus:ring-2 focus:ring-primary outline-none"/>
+<div class="border border-outline-variant rounded-lg overflow-hidden bg-card">
+<div class="rte-tb" id="prte-toolbar">
+<button type="button" data-cmd="formatBlock" data-val="p">P</button>
+<button type="button" data-cmd="formatBlock" data-val="h2">H2</button>
+<button type="button" data-cmd="formatBlock" data-val="h3">H3</button>
+<span class="sep"></span>
+<button type="button" data-cmd="bold"><span class="material-symbols-outlined text-[20px]">format_bold</span></button>
+<button type="button" data-cmd="italic"><span class="material-symbols-outlined text-[20px]">format_italic</span></button>
+<button type="button" data-cmd="insertUnorderedList"><span class="material-symbols-outlined text-[20px]">format_list_bulleted</span></button>
+<button type="button" data-cmd="insertOrderedList"><span class="material-symbols-outlined text-[20px]">format_list_numbered</span></button>
+<button type="button" id="prte-link"><span class="material-symbols-outlined text-[20px]">link</span></button>
+<span class="sep"></span>
+<button type="button" id="prte-code" class="text-xs">&lt;/&gt;</button>
+</div>
+<div id="prte-body" class="rte-area" contenteditable="true" data-ph="Page content…"></div>
+<textarea id="prte-html" class="hidden w-full p-4 font-mono text-sm bg-card text-on-surface outline-none" style="min-height:360px;"></textarea>
+</div>
+</div>
+<div class="space-y-4">
+<div class="wp-box"><div class="wp-box-h">Publish</div><div class="p-3 space-y-3">
+<div><label class="ad-label">Slug</label><input name="slug" class="ad-input" placeholder="auto from title"/></div>
+<label class="flex items-center gap-2 text-sm"><input name="showInFooter" type="checkbox" class="w-4 h-4 rounded text-primary"/>Show in footer menu</label>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant">
+<button type="button" id="page-delete" class="hidden text-error text-sm font-bold hover:underline">Trash</button>
+<button class="ml-auto px-5 py-2 rounded-lg bg-primary text-on-primary font-black uppercase text-xs tracking-wide"><span id="page-publish-label">Publish</span></button>
+</div>
+</div></div>
+</div>
+</div>
+</form>
+</section>
+
+<!-- MEDIA -->
+<section data-panel="media" class="hidden">
+<div class="flex items-center justify-between mb-4">
+<label class="cursor-pointer flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold"><span class="material-symbols-outlined text-[20px]">upload</span> Upload Media<input type="file" accept="image/*" class="hidden" id="media-upload"/></label>
+<p id="media-count" class="text-on-surface-variant text-sm"></p>
+</div>
+<div id="media-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
+</section>
+
+<!-- MENU BUILDER -->
+<section data-panel="menu" class="hidden max-w-2xl">
+<p class="text-on-surface-variant text-sm mb-4">Build the top navigation menu. Drag order with the arrows; link to a section, a page, or any URL.</p>
+<div class="wp-box"><div class="wp-box-h flex items-center justify-between">Navigation Menu <button id="menu-add" class="text-primary text-xs font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">add</span>Add Item</button></div>
+<div id="menu-items" class="p-3 space-y-2"></div>
+</div>
+<div class="flex items-center gap-3 mt-4"><button id="menu-save" class="bg-primary text-on-primary px-6 py-3 rounded-lg font-black uppercase tracking-wide hover:brightness-105 active:scale-95 transition">Save Menu</button><span id="menu-saved" class="text-primary font-bold hidden">Saved ✓</span></div>
+</section>
+
+<!-- SETTINGS -->
+<section data-panel="settings" class="hidden max-w-2xl">
+<form id="settings-form" class="space-y-5">
+<div class="wp-box"><div class="wp-box-h">General</div><div class="p-4 space-y-4">
+<div><label class="ad-label">Site Name</label><input name="siteName" class="ad-input"/></div>
+<div><label class="ad-label">Tagline</label><input name="tagline" class="ad-input"/></div>
+<div><label class="ad-label">Footer About</label><textarea name="footerAbout" rows="2" class="ad-input"></textarea></div>
+</div></div>
+<div class="wp-box"><div class="wp-box-h">Branding — Logo &amp; Favicon</div><div class="p-4 space-y-4">
+<div><label class="ad-label">Site Logo (header &amp; footer)</label>
+<div class="flex items-center gap-3 mb-2"><img id="logo-preview" class="h-10 w-auto rounded border border-outline-variant bg-surface-container p-1 hidden"/></div>
+<div class="flex gap-2"><input name="logo" class="ad-input flex-1" placeholder="/assets/logo.svg — or upload →"/><label class="cursor-pointer flex items-center gap-1 px-3 rounded-lg border border-outline-variant text-primary font-bold text-sm"><span class="material-symbols-outlined text-[18px]">upload</span>Upload<input type="file" accept="image/*" class="hidden" data-supload="logo"/></label></div>
+<p class="text-xs text-on-surface-variant mt-1">Wide/horizontal logo works best. Leave blank to use the built-in US Trendy logo.</p>
+<div class="mt-3"><label class="ad-label">Header logo size — <span id="logoHeight-val" class="text-primary font-bold">44</span> px</label><input id="logoHeight" name="logoHeight" type="range" min="20" max="110" value="44" class="w-full accent-primary"/><div class="mt-2 flex items-center gap-3 border border-dashed border-outline-variant rounded-lg p-2"><span class="text-[11px] text-on-surface-variant uppercase font-bold">Preview</span><img id="logo-size-preview" class="w-auto" style="height:44px" src="/assets/logo.svg"/></div></div></div>
+<div><label class="ad-label">Favicon (browser tab icon)</label>
+<div class="flex items-center gap-3 mb-2"><img id="favicon-preview" class="h-9 w-9 rounded border border-outline-variant bg-surface-container p-0.5 hidden"/></div>
+<div class="flex gap-2"><input name="favicon" class="ad-input flex-1" placeholder="/assets/favicon.svg — or upload →"/><label class="cursor-pointer flex items-center gap-1 px-3 rounded-lg border border-outline-variant text-primary font-bold text-sm"><span class="material-symbols-outlined text-[18px]">upload</span>Upload<input type="file" accept="image/*" class="hidden" data-supload="favicon"/></label></div>
+<p class="text-xs text-on-surface-variant mt-1">Square image recommended.</p></div>
+</div></div>
+<div class="wp-box"><div class="wp-box-h">Breaking News Ticker</div><div class="p-4 space-y-3">
+<label class="flex items-center gap-2"><input id="breakingEnabled" name="breakingEnabled" type="checkbox" class="w-5 h-5 rounded text-primary"/><span class="text-on-surface font-bold">Show breaking-news ticker</span></label>
+<div><label class="ad-label">Text</label><input name="breaking" class="ad-input"/></div>
+</div></div>
+<div class="wp-box"><div class="wp-box-h">Live Match Widget</div><div class="p-4 grid grid-cols-2 gap-3">
+<div><label class="ad-label">Home Team</label><input name="lm_home" class="ad-input"/></div>
+<div><label class="ad-label">Away Team</label><input name="lm_away" class="ad-input"/></div>
+<div><label class="ad-label">Home Score</label><input name="lm_homeScore" class="ad-input"/></div>
+<div><label class="ad-label">Away Score</label><input name="lm_awayScore" class="ad-input"/></div>
+<div><label class="ad-label">Status / Minute</label><input name="lm_status" class="ad-input" placeholder="78' or 88' - Full Time"/></div>
+<div><label class="ad-label">Competition</label><input name="lm_league" class="ad-input" placeholder="International Friendly"/></div>
+<div><label class="ad-label">Home Scorers (comma separated)</label><input name="lm_homeScorers" class="ad-input" placeholder="Rodrygo 23', Vinícius Jr. 67'"/></div>
+<div><label class="ad-label">Away Scorers (comma separated)</label><input name="lm_awayScorers" class="ad-input" placeholder="L. Martínez 41'"/></div>
+<div class="col-span-2 flex items-center gap-2 pt-1"><input id="lm_live" name="lm_live" type="checkbox" class="w-5 h-5 rounded text-primary"/><label for="lm_live" class="text-on-surface font-bold">Feature as a <span class="text-error">LIVE</span> match on the Live Scores page</label></div>
+</div></div>
+<div class="flex items-center gap-3"><button class="bg-primary text-on-primary px-6 py-3 rounded-lg font-black uppercase tracking-wide hover:brightness-105 active:scale-95 transition">Save Settings</button><span id="settings-saved" class="text-primary font-bold hidden">Saved ✓</span></div>
+</form>
+</section>
+
+<!-- ACCOUNT -->
+<section data-panel="account" class="hidden max-w-md">
+<form id="account-form" class="wp-box"><div class="wp-box-h">Account</div><div class="p-4 space-y-4">
+<div><label class="ad-label">Username</label><input name="username" autocomplete="username" class="ad-input"/></div>
+<div><label class="ad-label">New Password</label><input name="password" type="password" autocomplete="new-password" class="ad-input" placeholder="Leave blank to keep current"/></div>
+<div class="flex items-center gap-3"><button class="bg-primary text-on-primary px-6 py-3 rounded-lg font-black uppercase tracking-wide">Update Account</button><span id="account-saved" class="text-primary font-bold hidden">Updated ✓</span></div>
+</div></form>
+</section>
+
+</main>
+</div>
+</div>
+
+<script src="/assets/admin.js"></script>
+</body>
+</html>
