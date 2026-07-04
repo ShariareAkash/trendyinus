@@ -394,13 +394,13 @@
     $('#media-count').textContent = media.length + ' item' + (media.length === 1 ? '' : 's');
     if (!media.length) { $('#media-grid').innerHTML = '<p class="col-span-full text-on-surface-variant py-8 text-center">No media yet. Upload an image to get started.</p>'; return; }
     $('#media-grid').innerHTML = media.map(function (m) {
-      return '<div class="group relative rounded-lg overflow-hidden border border-outline-variant bg-card"><img src="' + esc(m.url) + '" class="w-full h-28 object-cover"/><div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5"><button data-copy="' + esc(m.url) + '" class="text-white text-xs bg-primary text-on-primary px-2 py-1 rounded font-bold">Copy URL</button><button data-delm="' + esc(m.name) + '" class="text-white text-xs bg-error px-2 py-1 rounded font-bold">Delete</button></div></div>';
+      return '<div class="group relative rounded-lg overflow-hidden border border-outline-variant bg-card"><img src="' + esc(m.url) + '" class="w-full h-28 object-cover"/><div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5"><button data-copy="' + esc(m.url) + '" class="text-white text-xs bg-primary text-on-primary px-2 py-1 rounded font-bold">Copy URL</button><button data-delm="' + esc(m.del || m.name) + '" class="text-white text-xs bg-error px-2 py-1 rounded font-bold">Delete</button></div></div>';
     }).join('');
   }
   $('#media-grid').addEventListener('click', function (e) {
     var cp = e.target.closest('[data-copy]'), dl = e.target.closest('[data-delm]');
-    if (cp) { navigator.clipboard.writeText(location.origin + cp.dataset.copy); cp.textContent = 'Copied!'; setTimeout(function () { cp.textContent = 'Copy URL'; }, 1200); }
-    if (dl) { if (confirm('Delete this file?')) api('DELETE', '/api/media/' + encodeURIComponent(dl.dataset.delm)).then(function () { loadMedia().then(renderMedia); }); }
+    if (cp) { var u = cp.dataset.copy; navigator.clipboard.writeText(/^https?:/i.test(u) ? u : location.origin + u); cp.textContent = 'Copied!'; setTimeout(function () { cp.textContent = 'Copy URL'; }, 1200); }
+    if (dl) { if (confirm('Delete this file?')) api('DELETE', '/api/media?del=' + encodeURIComponent(dl.dataset.delm)).then(function () { loadMedia().then(renderMedia); }); }
   });
   $('#media-upload').addEventListener('change', function () {
     if (!this.files[0]) return;

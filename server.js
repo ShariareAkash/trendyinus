@@ -20,6 +20,28 @@ const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const PORT = process.env.PORT || 5503;
 
 /* ------------------------------------------------------------------ *
+ * Storage back-ends. On a serverless host (Vercel) there is no writable
+ * disk or shared memory, so:
+ *   - data     -> Vercel KV (Upstash Redis REST) when KV_REST_API_URL is set
+ *   - uploads  -> Vercel Blob when BLOB_READ_WRITE_TOKEN is set
+ *   - auth     -> stateless JWT (below)
+ * Locally none of those env vars exist, so it falls back to db.json + /uploads.
+ * ------------------------------------------------------------------ */
+const KV_URL = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+const USE_KV = !!(KV_URL && KV_TOKEN);
+const SESSION_SECRET = process.env.SESSION_SECRET || 'trendyinus-local-dev-secret';
+let blobApi = null;
+try { blobApi = require('@vercel/blob'); } catch (_e) { /* not installed locally */ }
+const USE_BLOB = !!(blobApi && process.env.BLOB_READ_WRITE_TOKEN);
+
+async function kvCommand(cmd) {
+  const r = await fetch(KV_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + KV_TOKEN, 'Content-Type': 'application/json' }, body: JSON.stringify(cmd) });
+  const j = await r.json();
+  return j.result;
+}
+
+/* ------------------------------------------------------------------ *
  * Seed data — written to db.json on first run only.
  * ------------------------------------------------------------------ */
 const IMG = {
@@ -60,7 +82,7 @@ function seedAdmin() {
 }
 
 const SEED = {
-  admin: seedAdmin(),
+  admin: null, // filled by seedAdmin() only when a brand-new database is created
   settings: {
     siteName: 'TrendyinUS',
     tagline: 'World Class reporting for World Class fans.',
@@ -120,58 +142,85 @@ const SEED = {
 };
 
 /* ------------------------------------------------------------------ *
- * Persistence
+ * Persistence (KV on serverless, db.json locally). `db` is loaded per
+ * request via ensureDB() so it works statelessly on Vercel.
  * ------------------------------------------------------------------ */
-function loadDB() {
-  try {
-    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-  } catch (_e) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(SEED, null, 2));
-    return JSON.parse(JSON.stringify(SEED));
-  }
-}
-let db = loadDB();
-// Backfill fields added after the first db.json was written.
-(function migrate() {
+let db = null;
+function migrate(d) {
   let changed = false;
-  if (!db.categories) { db.categories = JSON.parse(JSON.stringify(SEED.categories)); changed = true; }
-  if (!db.pages) { db.pages = JSON.parse(JSON.stringify(SEED.pages)); changed = true; }
-  if (db.nextCatId == null) { db.nextCatId = SEED.nextCatId; changed = true; }
-  if (db.nextPageId == null) { db.nextPageId = SEED.nextPageId; changed = true; }
-  if (!db.settings.nav) { db.settings.nav = JSON.parse(JSON.stringify(SEED.settings.nav)); changed = true; }
-  // One-time migration: convert any legacy plaintext admin password into a scrypt hash, then drop the plaintext.
-  if (db.admin && db.admin.password) {
-    const hp = hashPassword(db.admin.password);
-    db.admin.passSalt = hp.salt; db.admin.passHash = hp.hash;
-    delete db.admin.password;
-    changed = true;
+  if (!d.admin || (!d.admin.passHash && !d.admin.password)) { d.admin = seedAdmin(); changed = true; }
+  if (!d.categories) { d.categories = JSON.parse(JSON.stringify(SEED.categories)); changed = true; }
+  if (!d.pages) { d.pages = JSON.parse(JSON.stringify(SEED.pages)); changed = true; }
+  if (d.nextCatId == null) { d.nextCatId = SEED.nextCatId; changed = true; }
+  if (d.nextPageId == null) { d.nextPageId = SEED.nextPageId; changed = true; }
+  if (!d.settings) { d.settings = JSON.parse(JSON.stringify(SEED.settings)); changed = true; }
+  if (!d.settings.nav) { d.settings.nav = JSON.parse(JSON.stringify(SEED.settings.nav)); changed = true; }
+  if (!Array.isArray(d.posts)) { d.posts = []; changed = true; }
+  if (d.nextId == null) { d.nextId = SEED.nextId; changed = true; }
+  // Convert any legacy plaintext admin password into a scrypt hash, then drop it.
+  if (d.admin && d.admin.password) {
+    const hp = hashPassword(d.admin.password);
+    d.admin.passSalt = hp.salt; d.admin.passHash = hp.hash; delete d.admin.password; changed = true;
   }
-  db.posts.forEach(function (p) {
+  d.posts.forEach(function (p) {
     if (!p.status) { p.status = 'published'; changed = true; }
     if (!Array.isArray(p.categories)) { p.categories = p.category ? [p.category] : []; changed = true; }
   });
-  if (changed) fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-})();
-let saveTimer = null;
-function saveDB() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), () => {});
-  }, 50);
+  return changed;
+}
+async function readRawDB() {
+  if (USE_KV) { try { return await kvCommand(['GET', 'db']); } catch (_e) { return null; } }
+  try { return fs.readFileSync(DB_PATH, 'utf8'); } catch (_e) { return null; }
+}
+async function ensureDB() {
+  const raw = await readRawDB();
+  let obj = null;
+  try { obj = raw ? JSON.parse(raw) : null; } catch (_e) { obj = null; }
+  let fresh = false;
+  if (!obj) { obj = JSON.parse(JSON.stringify(SEED)); obj.posts = []; fresh = true; }
+  const changed = migrate(obj);
+  db = obj;
+  if (fresh || changed) await saveDB();
+}
+async function saveDB() {
+  const s = JSON.stringify(db);
+  if (USE_KV) { try { await kvCommand(['SET', 'db', s]); } catch (_e) {} return; }
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DB_PATH, s); } catch (_e) {}
 }
 
 /* ------------------------------------------------------------------ *
- * Auth (in-memory bearer tokens)
+ * Auth — stateless JWT (HMAC-SHA256), so it works across serverless
+ * invocations with no shared memory.
  * ------------------------------------------------------------------ */
-const tokens = new Set();
-// Brute-force protection: max 5 failed password attempts per device, then a lockout.
-const loginState = {};
 const MAX_LOGIN_FAILS = 5;
 const LOGIN_LOCK_MS = 15 * 60 * 1000;
+const loginState = {}; // local fallback for the lockout counter
+function b64u(buf) { return Buffer.from(buf).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
+function signToken(payload) {
+  const body = b64u(JSON.stringify(payload));
+  const sig = b64u(crypto.createHmac('sha256', SESSION_SECRET).update(body).digest());
+  return body + '.' + sig;
+}
+function verifyToken(t) {
+  if (!t) return null;
+  const i = t.lastIndexOf('.'); if (i < 1) return null;
+  const body = t.slice(0, i), sig = t.slice(i + 1);
+  const expect = b64u(crypto.createHmac('sha256', SESSION_SECRET).update(body).digest());
+  const a = Buffer.from(sig), b = Buffer.from(expect);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try { const p = JSON.parse(Buffer.from(body.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); if (p.exp && Date.now() > p.exp) return null; return p; } catch (_e) { return null; }
+}
 function isAuthed(req) {
   const h = req.headers['authorization'] || '';
-  const t = h.replace(/^Bearer\s+/i, '');
-  return t && tokens.has(t);
+  return !!verifyToken(h.replace(/^Bearer\s+/i, ''));
+}
+async function getLock(key) {
+  if (USE_KV) { try { const v = await kvCommand(['GET', 'lock:' + key]); return v ? JSON.parse(v) : { fails: 0, lockUntil: 0 }; } catch (_e) { return { fails: 0, lockUntil: 0 }; } }
+  return loginState[key] || (loginState[key] = { fails: 0, lockUntil: 0 });
+}
+async function setLock(key, st) {
+  if (USE_KV) { try { await kvCommand(['SET', 'lock:' + key, JSON.stringify(st), 'EX', String(Math.ceil(LOGIN_LOCK_MS / 1000) * 2)]); } catch (_e) {} return; }
+  loginState[key] = st;
 }
 
 /* ------------------------------------------------------------------ *
@@ -204,6 +253,14 @@ function checkJsonLimits(v, depth) {
 }
 function readBody(req, maxBytes) {
   maxBytes = maxBytes || 1048576; // 1 MB default for JSON API bodies
+  // Some serverless runtimes (Vercel) pre-buffer/parse the body onto req.body.
+  if (req.body !== undefined && req.body !== null) {
+    let parsed = req.body;
+    if (Buffer.isBuffer(parsed)) parsed = parsed.toString('utf8');
+    if (typeof parsed === 'string') { try { parsed = parsed ? JSON.parse(parsed) : {}; } catch (_e) { parsed = {}; } }
+    try { checkJsonLimits(parsed, 0); } catch (e) { return Promise.reject(e); }
+    return Promise.resolve(parsed || {});
+  }
   return new Promise((resolve, reject) => {
     let len = 0; const chunks = []; let done = false;
     req.on('data', (c) => {
@@ -304,9 +361,9 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/login' && method === 'POST') {
     const b = await readBody(req);
     const key = (b.deviceId && String(b.deviceId).slice(0, 64)) ||
-      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || 'unknown';
     const now = Date.now();
-    const st = loginState[key] || (loginState[key] = { fails: 0, lockUntil: 0 });
+    const st = await getLock(key);
     if (st.lockUntil > now) {
       const mins = Math.ceil((st.lockUntil - now) / 60000);
       return sendJSON(res, 429, { error: 'Too many failed attempts. This device is locked for ' + mins + ' more minute' + (mins === 1 ? '' : 's') + '.', locked: true });
@@ -314,22 +371,21 @@ async function handleApi(req, res, pathname) {
     const inUser = String(b.username || '').trim();
     const inPass = String(b.password || '').trim();
     if (inUser.toLowerCase() === String(db.admin.username).toLowerCase() && verifyPassword(inPass, db.admin.passSalt, db.admin.passHash)) {
-      st.fails = 0; st.lockUntil = 0;
-      const token = crypto.randomBytes(24).toString('hex');
-      tokens.add(token);
+      await setLock(key, { fails: 0, lockUntil: 0 });
+      const token = signToken({ u: db.admin.username, exp: Date.now() + 8 * 3600 * 1000 });
       return sendJSON(res, 200, { token, username: db.admin.username });
     }
     st.fails++;
     const left = MAX_LOGIN_FAILS - st.fails;
     if (left <= 0) {
-      st.lockUntil = now + LOGIN_LOCK_MS; st.fails = 0;
+      await setLock(key, { fails: 0, lockUntil: now + LOGIN_LOCK_MS });
       return sendJSON(res, 429, { error: 'Too many failed attempts. This device is locked for ' + Math.ceil(LOGIN_LOCK_MS / 60000) + ' minutes.', locked: true });
     }
+    await setLock(key, st);
     return sendJSON(res, 401, { error: 'Invalid username or password. ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left before this device is locked.' });
   }
   if (pathname === '/api/logout' && method === 'POST') {
-    const h = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
-    tokens.delete(h);
+    // Stateless JWT — the client discards the token; nothing to invalidate server-side.
     return sendJSON(res, 200, { ok: true });
   }
   if (pathname === '/api/me' && method === 'GET') {
@@ -393,21 +449,21 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/settings' && method === 'PUT') {
     const b = await readBody(req);
     db.settings = Object.assign({}, db.settings, b);
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, db.settings);
   }
   if (pathname === '/api/account' && method === 'PUT') {
     const b = await readBody(req);
     if (b.username) db.admin.username = String(b.username).trim();
     if (b.password) { const hp = hashPassword(String(b.password).trim()); db.admin.passSalt = hp.salt; db.admin.passHash = hp.hash; delete db.admin.password; }
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, { ok: true });
   }
   if (pathname === '/api/posts' && method === 'POST') {
     const b = await readBody(req);
     const post = normalizePost(b, { id: db.nextId++ });
     db.posts.push(post);
-    saveDB();
+    await saveDB();
     return sendJSON(res, 201, post);
   }
   if (single && method === 'PUT') {
@@ -416,14 +472,14 @@ async function handleApi(req, res, pathname) {
     if (idx === -1) return sendJSON(res, 404, { error: 'Not found' });
     const b = await readBody(req);
     db.posts[idx] = normalizePost(Object.assign({}, db.posts[idx], b), { id });
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, db.posts[idx]);
   }
   if (single && method === 'DELETE') {
     const id = parseInt(single[1], 10);
     const before = db.posts.length;
     db.posts = db.posts.filter((p) => p.id !== id);
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, { deleted: before - db.posts.length });
   }
   if (pathname === '/api/upload' && method === 'POST') {
@@ -434,8 +490,12 @@ async function handleApi(req, res, pathname) {
     if (!ext) return sendJSON(res, 400, { error: 'Unsupported image type' });
     const buf = Buffer.from(m[2], 'base64');
     if (buf.length > 8 * 1024 * 1024) return sendJSON(res, 413, { error: 'Image exceeds the 8 MB limit' });
-    if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
     const name = crypto.randomBytes(8).toString('hex') + ext;
+    if (USE_BLOB) {
+      const put = await blobApi.put('uploads/' + name, buf, { access: 'public', contentType: m[1], token: process.env.BLOB_READ_WRITE_TOKEN });
+      return sendJSON(res, 201, { url: put.url });
+    }
+    if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     fs.writeFileSync(path.join(UPLOAD_DIR, name), buf);
     return sendJSON(res, 201, { url: '/uploads/' + name });
   }
@@ -446,7 +506,7 @@ async function handleApi(req, res, pathname) {
     const name = String(b.name || '').trim();
     if (!name) return sendJSON(res, 400, { error: 'Name required' });
     const cat = { id: db.nextCatId++, name: name, slug: slugify(b.slug || name) };
-    db.categories.push(cat); saveDB();
+    db.categories.push(cat); await saveDB();
     return sendJSON(res, 201, cat);
   }
   const catId = pathname.match(/^\/api\/categories\/(\d+)$/);
@@ -456,14 +516,14 @@ async function handleApi(req, res, pathname) {
     const b = await readBody(req);
     if (b.name != null) c.name = String(b.name).trim();
     c.slug = slugify(b.slug || c.slug || c.name);
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, c);
   }
   if (catId && method === 'DELETE') {
     const id = parseInt(catId[1], 10);
     const before = db.categories.length;
     db.categories = db.categories.filter((c) => c.id !== id);
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, { deleted: before - db.categories.length });
   }
 
@@ -471,7 +531,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/pages' && method === 'POST') {
     const b = await readBody(req);
     const page = normalizePage(b, { id: db.nextPageId++ });
-    db.pages.push(page); saveDB();
+    db.pages.push(page); await saveDB();
     return sendJSON(res, 201, page);
   }
   const pageId = pathname.match(/^\/api\/pages\/(\d+)$/);
@@ -480,30 +540,38 @@ async function handleApi(req, res, pathname) {
     if (idx === -1) return sendJSON(res, 404, { error: 'Not found' });
     const b = await readBody(req);
     db.pages[idx] = normalizePage(Object.assign({}, db.pages[idx], b), { id: db.pages[idx].id });
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, db.pages[idx]);
   }
   if (pageId && method === 'DELETE') {
     const id = parseInt(pageId[1], 10);
     const before = db.pages.length;
     db.pages = db.pages.filter((p) => p.id !== id);
-    saveDB();
+    await saveDB();
     return sendJSON(res, 200, { deleted: before - db.pages.length });
   }
 
   // --- media library (auth) ---
   if (pathname === '/api/media' && method === 'GET') {
     let files = [];
-    try {
-      files = fs.readdirSync(UPLOAD_DIR)
-        .map((f) => ({ url: '/uploads/' + f, name: f, mtime: fs.statSync(path.join(UPLOAD_DIR, f)).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime);
-    } catch (_e) {}
+    if (USE_BLOB) {
+      try {
+        const listed = await blobApi.list({ prefix: 'uploads/', token: process.env.BLOB_READ_WRITE_TOKEN });
+        files = (listed.blobs || []).map((b) => ({ url: b.url, name: (b.pathname || '').replace(/^uploads\//, ''), del: b.url, mtime: +new Date(b.uploadedAt || Date.now()) })).sort((a, b) => b.mtime - a.mtime);
+      } catch (_e) {}
+    } else {
+      try {
+        files = fs.readdirSync(UPLOAD_DIR)
+          .map((f) => ({ url: '/uploads/' + f, name: f, del: f, mtime: fs.statSync(path.join(UPLOAD_DIR, f)).mtimeMs }))
+          .sort((a, b) => b.mtime - a.mtime);
+      } catch (_e) {}
+    }
     return sendJSON(res, 200, files);
   }
-  const mediaName = pathname.match(/^\/api\/media\/([\w.-]+)$/);
-  if (mediaName && method === 'DELETE') {
-    try { fs.unlinkSync(path.join(UPLOAD_DIR, mediaName[1])); } catch (_e) {}
+  if (pathname === '/api/media' && method === 'DELETE') {
+    const del = String((url.parse(req.url, true).query.del) || '');
+    if (/^https?:/i.test(del)) { if (USE_BLOB) { try { await blobApi.del(del, { token: process.env.BLOB_READ_WRITE_TOKEN }); } catch (_e) {} } }
+    else if (del) { try { fs.unlinkSync(path.join(UPLOAD_DIR, path.basename(del))); } catch (_e) {} }
     return sendJSON(res, 200, { ok: true });
   }
 
@@ -604,27 +672,37 @@ function buildSitemap(base) {
 }
 
 /* ------------------------------------------------------------------ *
- * Server
+ * Request handler — exported for Vercel (serverless) and used by the
+ * local http server below. Loads the DB per request so it is stateless.
  * ------------------------------------------------------------------ */
-http.createServer((req, res) => {
+async function requestHandler(req, res) {
   const pathname = url.parse(req.url).pathname;
-  if (pathname === '/robots.txt') {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    return res.end(buildRobots(siteBase(req)));
+  const dynamic = pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname.startsWith('/api/');
+  try {
+    if (dynamic) await ensureDB();
+    if (pathname === '/robots.txt') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(buildRobots(siteBase(req)));
+    }
+    if (pathname === '/sitemap.xml') {
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(buildSitemap(siteBase(req)));
+    }
+    if (pathname.startsWith('/api/')) return await handleApi(req, res, pathname);
+    return serveStatic(req, res, pathname); // local only; on Vercel static files are served by the platform
+  } catch (e) {
+    const code = (e && e.httpCode) || 500;
+    if (!res.headersSent) sendJSON(res, code, { error: String(e && e.message || e) });
   }
-  if (pathname === '/sitemap.xml') {
-    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
-    return res.end(buildSitemap(siteBase(req)));
-  }
-  if (pathname.startsWith('/api/')) {
-    handleApi(req, res, pathname).catch((e) => {
-      const code = (e && e.httpCode) || 500;
-      sendJSON(res, code, { error: String(e && e.message || e) });
-    });
-    return;
-  }
-  serveStatic(req, res, pathname);
-}).listen(PORT, () => {
-  console.log('TrendyinUS running at http://localhost:' + PORT);
-  console.log('Admin panel:            http://localhost:' + PORT + '/admin.html');
-});
+}
+
+module.exports = requestHandler;
+
+// Run a real HTTP server only when executed directly (local dev / Node hosts).
+if (require.main === module) {
+  http.createServer(requestHandler).listen(PORT, () => {
+    console.log('TrendyinUS running at http://localhost:' + PORT);
+    console.log('Admin panel:            http://localhost:' + PORT + '/admin.html');
+    console.log('Storage: ' + (USE_KV ? 'Vercel KV' : 'local db.json') + ' | Uploads: ' + (USE_BLOB ? 'Vercel Blob' : 'local /uploads'));
+  });
+}
