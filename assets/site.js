@@ -1,6 +1,20 @@
 /* TrendyinUS — public site engine.
  * Applies the theme, mounts shared chrome (header / footer / side-nav),
  * and renders post-driven content from the JSON API. */
+
+/* Google Analytics 4 — loaded on every page via this shared script. */
+(function () {
+  var ID = 'G-8EK47W4QYH';
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', ID);
+})();
+
 (function () {
   'use strict';
 
