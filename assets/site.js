@@ -155,6 +155,7 @@
     var menuCol = navItems().map(function (n) { return [n.label, n.href]; });
     var footerPages = pagesList.filter(function (p) { return p.showInFooter; });
     var pagesCol = footerPages.map(function (p) { return [p.title, 'page.html?p=' + p.slug]; });
+    pagesCol.push(['Sitemap', 'https://trendyinus.com/sitemap.xml']); // links to the XML sitemap, sits under Terms of Service
     var bottomLinks = footerPages.map(function (p) { return '<a class="text-on-surface-variant font-label-sm hover:text-primary" href="page.html?p=' + esc(p.slug) + '">' + esc(p.title) + '</a>'; }).join('');
     host.innerHTML =
       '<footer class="bg-surface-container-low border-t border-outline-variant w-full mt-stack-lg">' +
