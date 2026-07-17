@@ -92,26 +92,26 @@ const SEED = {
     liveMatch: { home: 'Real Madrid', away: 'Dortmund', homeScore: '2', awayScore: '0', status: "88' - Full Time" },
     nav: [
       { label: 'Live Scores', href: 'live-scores.html' },
-      { label: 'World Cup', href: 'world-cup.html' },
-      { label: 'Transfers', href: 'transfers.html' },
-      { label: 'Leagues', href: 'leagues.html' },
-      { label: 'Features', href: 'features.html' },
-      { label: 'News', href: 'news.html' },
-      { label: 'Podcasts', href: 'podcasts.html' }
+      { label: 'Soccer', href: 'soccer.html' },
+      { label: 'MLB', href: 'mlb.html' },
+      { label: 'NFL', href: 'nfl.html' },
+      { label: 'WNBA', href: 'wnba.html' },
+      { label: 'Tennis', href: 'tennis.html' },
+      { label: 'WWE', href: 'wwe.html' },
+      { label: 'Others', href: 'others.html' }
     ]
   },
   nextId: 19,
-  nextCatId: 9,
+  nextCatId: 8,
   nextPageId: 5,
   categories: [
-    { id: 1, name: 'Premier League', slug: 'premier-league' },
-    { id: 2, name: 'La Liga', slug: 'la-liga' },
-    { id: 3, name: 'Serie A', slug: 'serie-a' },
-    { id: 4, name: 'Champions League', slug: 'champions-league' },
-    { id: 5, name: 'Transfers', slug: 'transfers' },
-    { id: 6, name: 'World Cup 2026', slug: 'world-cup-2026' },
-    { id: 7, name: 'Analysis', slug: 'analysis' },
-    { id: 8, name: 'Interview', slug: 'interview' }
+    { id: 1, name: 'Soccer', slug: 'soccer' },
+    { id: 2, name: 'MLB', slug: 'mlb' },
+    { id: 3, name: 'NFL', slug: 'nfl' },
+    { id: 4, name: 'WNBA', slug: 'wnba' },
+    { id: 5, name: 'Tennis', slug: 'tennis' },
+    { id: 6, name: 'WWE', slug: 'wwe' },
+    { id: 7, name: 'Others', slug: 'others' }
   ],
   pages: [
     { id: 1, slug: 'about', title: 'About TrendyinUS', showInFooter: true, body: '<p>TrendyinUS is a premium football news portal delivering authoritative, energetic and instant coverage of the global game. From the Champions League to the World Cup, our correspondents bring you the stories, tactics and transfers that matter.</p><p>Founded for World Class fans, we combine long-form editorial with breaking-news urgency.</p>' },
@@ -690,7 +690,7 @@ function buildSitemap(base) {
   const urls = [];
   const add = (loc, freq, pri) => urls.push({ loc: loc, freq: freq, pri: pri });
   add(base + '/', 'daily', '1.0');
-  ['live-scores', 'world-cup', 'transfers', 'leagues', 'features', 'news', 'podcasts'].forEach((s) => add(base + '/' + s + '.html', 'daily', '0.7'));
+  ['live-scores', 'soccer', 'mlb', 'nfl', 'wnba', 'tennis', 'wwe', 'others'].forEach((s) => add(base + '/' + s + '.html', 'daily', '0.7'));
   db.pages.forEach((p) => add(base + '/page.html?p=' + encodeURIComponent(p.slug), 'monthly', '0.4'));
   db.posts.filter(isVisible).forEach((p) => add(base + '/article.html?id=' + p.id, 'weekly', '0.6'));
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
@@ -737,6 +737,13 @@ try {
   fs.statSync(path.join(__dirname, 'live-scores.html'));
   fs.statSync(path.join(__dirname, 'podcasts.html'));
   fs.statSync(path.join(__dirname, 'page.html'));
+  fs.statSync(path.join(__dirname, 'soccer.html'));
+  fs.statSync(path.join(__dirname, 'mlb.html'));
+  fs.statSync(path.join(__dirname, 'nfl.html'));
+  fs.statSync(path.join(__dirname, 'wnba.html'));
+  fs.statSync(path.join(__dirname, 'tennis.html'));
+  fs.statSync(path.join(__dirname, 'wwe.html'));
+  fs.statSync(path.join(__dirname, 'others.html'));
   fs.statSync(path.join(__dirname, 'assets/site.js'));
   fs.statSync(path.join(__dirname, 'assets/admin.js'));
   fs.statSync(path.join(__dirname, 'assets/theme.css'));

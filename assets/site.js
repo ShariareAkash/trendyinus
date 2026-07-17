@@ -20,12 +20,13 @@
 
   var DEFAULT_NAV = [
     { label: 'Live Scores', href: 'live-scores.html' },
-    { label: 'World Cup', href: 'world-cup.html' },
-    { label: 'Transfers', href: 'transfers.html' },
-    { label: 'Leagues', href: 'leagues.html' },
-    { label: 'Features', href: 'features.html' },
-    { label: 'News', href: 'news.html' },
-    { label: 'Podcasts', href: 'podcasts.html' }
+    { label: 'Soccer', href: 'soccer.html' },
+    { label: 'MLB', href: 'mlb.html' },
+    { label: 'NFL', href: 'nfl.html' },
+    { label: 'WNBA', href: 'wnba.html' },
+    { label: 'Tennis', href: 'tennis.html' },
+    { label: 'WWE', href: 'wwe.html' },
+    { label: 'Others', href: 'others.html' }
   ];
   // Nav comes from Site Settings (Menu builder); falls back to the defaults above.
   function navItems() {
@@ -252,7 +253,8 @@
   function renderSection(page, posts) {
     var q = (qs('q') || '').toLowerCase();
     var list = posts;
-    if (page.section) list = posts.filter(function (p) { return p.section === page.section; });
+    if (page.category) list = posts.filter(function (p) { return (p.categories && p.categories.indexOf(page.category) !== -1) || p.category === page.category; });
+    else if (page.section) list = posts.filter(function (p) { return p.section === page.section; });
     if (q) list = posts.filter(function (p) { return (p.title + ' ' + p.category + ' ' + p.excerpt).toLowerCase().indexOf(q) !== -1; });
     if (el('section-title')) el('section-title').textContent = q ? 'Search: "' + q + '"' : page.title;
     if (el('section-subtitle')) el('section-subtitle').textContent = page.subtitle || '';
