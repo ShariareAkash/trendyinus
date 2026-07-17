@@ -146,6 +146,12 @@ const SEED = {
  * request via ensureDB() so it works statelessly on Vercel.
  * ------------------------------------------------------------------ */
 let db = null;
+let dbLoadedAt = 0;
+// ponytail: re-read the shared Blob/KV DB at most once per DB_TTL_MS. Without this, warm
+// serverless instances load the DB once and serve stale data forever after another instance
+// writes (a published post 404s on every instance except the writer). 3s trades a tiny blob
+// read for near-real-time consistency; raise it if blob reads ever get costly.
+const DB_TTL_MS = 3000;
 function migrate(d) {
   let changed = false;
   if (!d.admin || (!d.admin.passHash && !d.admin.password)) { d.admin = seedAdmin(); changed = true; }
@@ -187,7 +193,7 @@ async function readRawDB() {
   try { return fs.readFileSync(DB_PATH, 'utf8'); } catch (_e) { return null; }
 }
 async function ensureDB() {
-  if (db) return; // load once; the object persists in memory for the process lifetime
+  if (db && (Date.now() - dbLoadedAt) < DB_TTL_MS) return; // serve from memory within the TTL, then re-read
   const raw = await readRawDB();
   let obj = null;
   try { obj = raw ? JSON.parse(raw) : null; } catch (_e) { obj = null; }
@@ -195,9 +201,11 @@ async function ensureDB() {
   if (!obj) { obj = JSON.parse(JSON.stringify(SEED)); obj.posts = []; fresh = true; }
   const changed = migrate(obj);
   db = obj;
+  dbLoadedAt = Date.now();
   if (fresh || changed) await saveDB();
 }
 async function saveDB() {
+  dbLoadedAt = Date.now(); // just-written in-memory db is the freshest copy; don't re-read over it within the TTL
   if (USE_KV) { try { await kvCommand(['SET', 'db', JSON.stringify(db)]); } catch (_e) {} return; }
   if (USE_BLOB_DB) {
     const persist = Object.assign({}, db); delete persist.admin; // never write admin creds to a public Blob
