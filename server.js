@@ -192,8 +192,12 @@ async function readRawDB() {
   }
   try { return fs.readFileSync(DB_PATH, 'utf8'); } catch (_e) { return null; }
 }
-async function ensureDB() {
-  if (db && (Date.now() - dbLoadedAt) < DB_TTL_MS) return; // serve from memory within the TTL, then re-read
+async function ensureDB(force) {
+  // ponytail: writes MUST force a fresh read so a burst of mutations across serverless
+  // instances doesn't clobber each other (an instance holding a stale cached copy within the
+  // TTL would overwrite a concurrent change). Reads use the TTL cache. Tiny read→write race
+  // window remains for truly-simultaneous writers — fine for a single-admin CMS.
+  if (db && !force && (Date.now() - dbLoadedAt) < DB_TTL_MS) return; // serve from memory within the TTL, then re-read
   const raw = await readRawDB();
   let obj = null;
   try { obj = raw ? JSON.parse(raw) : null; } catch (_e) { obj = null; }
@@ -706,7 +710,7 @@ async function requestHandler(req, res) {
   const pathname = url.parse(req.url).pathname;
   const dynamic = pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname.startsWith('/api/');
   try {
-    if (dynamic) await ensureDB();
+    if (dynamic) await ensureDB(pathname.startsWith('/api/') && req.method !== 'GET' && req.method !== 'HEAD');
     if (pathname === '/robots.txt') {
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end(buildRobots(siteBase(req)));
