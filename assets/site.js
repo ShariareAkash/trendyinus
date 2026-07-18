@@ -4,7 +4,7 @@
 
 /* Google Analytics 4 — loaded on every page via this shared script. */
 (function () {
-  var ID = 'G-8EK47W4QYH';
+  var ID = 'G-9ZS6KMG0MY';
   var s = document.createElement('script');
   s.async = true;
   s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
