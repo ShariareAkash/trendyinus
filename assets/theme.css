@@ -103,3 +103,21 @@ body { transition: background-color .3s ease, color .3s ease; }
 .ticker-item:hover { text-decoration: underline; }
 .ticker-sep { color: rgb(var(--primary)); margin: 0 16px; font-weight: 900; }
 @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ---------- article body: media + embeds (responsive) ---------- */
+.article-body img { max-width: 100%; height: auto; border-radius: .75rem; }
+.article-body figure { margin: 1.5rem 0; }
+.article-body iframe { max-width: 100%; }
+.article-body h2 { font-size: 1.5rem; font-weight: 700; margin-top: 2rem; margin-bottom: .5rem; line-height: 1.25; }
+.article-body h3 { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: .5rem; }
+.article-body ul { list-style: disc; padding-left: 1.5rem; }
+.article-body ol { list-style: decimal; padding-left: 1.5rem; }
+.article-body table { display: block; width: 100%; overflow-x: auto; }
+
+/* YouTube: fluid 16:9 */
+.embed-yt { position: relative; width: 100%; padding-top: 56.25%; margin: 1.5rem 0; border-radius: .75rem; overflow: hidden; }
+.embed-yt iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* Instagram / X embeds shouldn't overflow on mobile */
+.article-body .instagram-media,
+.article-body .twitter-tweet { margin: 1.5rem auto !important; max-width: 100% !important; }

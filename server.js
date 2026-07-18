@@ -88,7 +88,7 @@ const SEED = {
     tagline: 'World Class reporting for World Class fans.',
     breaking: 'Transfer Deadline Day Live: Major Premier League deal expected within the hour.',
     breakingEnabled: true,
-    footerAbout: 'Premium football coverage for the global fan. Authoritative, energetic, and instant.',
+    footerAbout: 'Premium sports coverage for the global fan. Authoritative, energetic, and instant.',
     liveMatch: { home: 'Real Madrid', away: 'Dortmund', homeScore: '2', awayScore: '0', status: "88' - Full Time" },
     nav: [
       { label: 'Live Scores', href: 'live-scores.html' },
@@ -114,7 +114,7 @@ const SEED = {
     { id: 7, name: 'Others', slug: 'others' }
   ],
   pages: [
-    { id: 1, slug: 'about', title: 'About TrendyinUS', showInFooter: true, body: '<p>TrendyinUS is a premium football news portal delivering authoritative, energetic and instant coverage of the global game. From the Champions League to the World Cup, our correspondents bring you the stories, tactics and transfers that matter.</p><p>Founded for World Class fans, we combine long-form editorial with breaking-news urgency.</p>' },
+    { id: 1, slug: 'about', title: 'About TrendyinUS', showInFooter: true, body: '<p>TrendyinUS is a premium sports news portal delivering authoritative, energetic and instant coverage across soccer, MLB, NFL, WNBA, tennis and more.</p><p>Founded for World Class fans, we combine long-form editorial with breaking-news urgency.</p>' },
     { id: 2, slug: 'contact', title: 'Contact Us', showInFooter: true, body: '<p>Have a tip, a question, or a partnership enquiry? Reach the newsroom at <a class="text-primary font-bold" href="mailto:newsroom@trendyin.us">newsroom@trendyin.us</a>.</p><p>For advertising and media kits, email <a class="text-primary font-bold" href="mailto:ads@trendyin.us">ads@trendyin.us</a>.</p>' },
     { id: 3, slug: 'privacy', title: 'Privacy Policy', showInFooter: true, body: '<p>We respect your privacy. TrendyinUS collects only the information necessary to deliver our newsletter and improve your reading experience. We never sell your personal data.</p>' },
     { id: 4, slug: 'terms', title: 'Terms of Service', showInFooter: true, body: '<p>By using TrendyinUS you agree to use the site for lawful, personal, non-commercial purposes. All editorial content is provided for informational purposes.</p>' }
@@ -163,6 +163,19 @@ function migrate(d) {
   if (!d.settings.nav) { d.settings.nav = JSON.parse(JSON.stringify(SEED.settings.nav)); changed = true; }
   if (!Array.isArray(d.posts)) { d.posts = []; changed = true; }
   if (d.nextId == null) { d.nextId = SEED.nextId; changed = true; }
+  // Backfill article slugs (first 4 words of the title), keeping them unique.
+  if (Array.isArray(d.posts)) {
+    const taken = {};
+    d.posts.forEach((p) => { if (p.slug) taken[p.slug] = true; });
+    d.posts.forEach((p) => {
+      if (p.slug) return;
+      let base = firstWordsSlug(p.title, 4) || 'post';
+      if (RESERVED_SLUGS.indexOf(base) !== -1) base += '-post';
+      let cand = base, i = 2;
+      while (taken[cand]) cand = base + '-' + (i++);
+      p.slug = cand; taken[cand] = true; changed = true;
+    });
+  }
   // Convert any legacy plaintext admin password into a scrypt hash, then drop it.
   if (d.admin && d.admin.password) {
     const hp = hashPassword(d.admin.password);
@@ -493,6 +506,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/posts' && method === 'POST') {
     const b = await readBody(req);
     const post = normalizePost(b, { id: db.nextId++ });
+    post.slug = uniqueSlug(post.slug, post.id);
     db.posts.push(post);
     await saveDB();
     return sendJSON(res, 201, post);
@@ -503,6 +517,7 @@ async function handleApi(req, res, pathname) {
     if (idx === -1) return sendJSON(res, 404, { error: 'Not found' });
     const b = await readBody(req);
     db.posts[idx] = normalizePost(Object.assign({}, db.posts[idx], b), { id });
+    db.posts[idx].slug = uniqueSlug(db.posts[idx].slug, id);
     await saveDB();
     return sendJSON(res, 200, db.posts[idx]);
   }
@@ -612,6 +627,22 @@ async function handleApi(req, res, pathname) {
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'page';
 }
+// Article slug: default = first 4 words of the title joined with "-".
+function firstWordsSlug(title, n) {
+  const words = String(title || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, n);
+  return slugify(words.join('-'));
+}
+// Reserved so an article slug can never shadow a real page/route.
+const RESERVED_SLUGS = ['index', 'admin', 'article', 'page', 'news', 'soccer', 'mlb', 'nfl', 'wnba', 'tennis', 'wwe',
+  'others', 'live-scores', 'transfers', 'leagues', 'features', 'podcasts', 'api', 'uploads', 'assets', 'robots', 'sitemap'];
+function uniqueSlug(base, excludeId) {
+  let s = slugify(base) || 'post';
+  if (RESERVED_SLUGS.indexOf(s) !== -1) s += '-post';
+  let candidate = s, i = 2;
+  while (db.posts.some((p) => p.slug === candidate && p.id !== excludeId)) candidate = s + '-' + (i++);
+  return candidate;
+}
+
 function normalizePage(input, over) {
   const p = Object.assign({ title: 'Untitled Page', slug: '', body: '', showInFooter: false }, input, over);
   p.slug = slugify(p.slug || p.title);
@@ -624,7 +655,7 @@ function normalizePost(input, over) {
     title: 'Untitled', category: 'News', section: 'news', author: 'TrendyinUS Staff',
     authorRole: 'Staff Writer', authorAvatar: '', image: '', readTime: 5, date: new Date().toISOString(),
     featured: false, highlight: false, trending: false, excerpt: '', body: '', caption: '', tags: [],
-    status: 'published', categories: []
+    status: 'published', categories: [], slug: '', imageAlt: '', imageTitle: ''
   }, input, over);
   p.readTime = parseInt(p.readTime, 10) || 5;
   p.featured = !!p.featured; p.highlight = !!p.highlight; p.trending = !!p.trending;
@@ -634,6 +665,7 @@ function normalizePost(input, over) {
   if (!p.categories.length && p.category) p.categories = [p.category];
   p.category = p.categories[0] || p.category || 'News'; // primary = badge label
   if (['published', 'draft', 'scheduled'].indexOf(p.status) === -1) p.status = 'published';
+  p.slug = slugify(p.slug || firstWordsSlug(p.title, 4));
   return p;
 }
 
@@ -655,9 +687,11 @@ function serveStatic(req, res, pathname) {
   if (!filePath.startsWith(baseDir)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) {
-      // SPA-ish fallback: unknown non-file paths -> home
+      // Pretty article URLs (/my-post-slug) and SPA-ish fallback for other unknown paths.
       if (!path.extname(filePath)) {
-        return fs.readFile(path.join(ROOT, 'index.html'), (e, buf) => {
+        const seg = rel.replace(/^\/+|\/+$/g, '');
+        const isArticle = seg && seg.indexOf('/') === -1 && db && Array.isArray(db.posts) && db.posts.some((p) => p.slug === seg);
+        return fs.readFile(path.join(ROOT, isArticle ? 'article.html' : 'index.html'), (e, buf) => {
           if (e) { res.writeHead(404); return res.end('Not found'); }
           res.writeHead(200, { 'Content-Type': MIME['.html'] }); res.end(buf);
         });
@@ -696,7 +730,7 @@ function buildSitemap(base) {
   add(base + '/', 'daily', '1.0');
   ['live-scores', 'soccer', 'mlb', 'nfl', 'wnba', 'tennis', 'wwe', 'others'].forEach((s) => add(base + '/' + s + '.html', 'daily', '0.7'));
   db.pages.forEach((p) => add(base + '/page.html?p=' + encodeURIComponent(p.slug), 'monthly', '0.4'));
-  db.posts.filter(isVisible).forEach((p) => add(base + '/article.html?id=' + p.id, 'weekly', '0.6'));
+  db.posts.filter(isVisible).forEach((p) => add(base + '/' + (p.slug || ('article.html?id=' + p.id)), 'weekly', '0.6'));
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
     urls.map((u) => '  <url><loc>' + u.loc + '</loc><lastmod>' + now + '</lastmod><changefreq>' + u.freq + '</changefreq><priority>' + u.pri + '</priority></url>').join('\n') +
     '\n</urlset>\n';
@@ -735,7 +769,6 @@ try {
   fs.statSync(path.join(__dirname, 'article.html'));
   fs.statSync(path.join(__dirname, 'news.html'));
   fs.statSync(path.join(__dirname, 'transfers.html'));
-  fs.statSync(path.join(__dirname, 'world-cup.html'));
   fs.statSync(path.join(__dirname, 'leagues.html'));
   fs.statSync(path.join(__dirname, 'features.html'));
   fs.statSync(path.join(__dirname, 'live-scores.html'));

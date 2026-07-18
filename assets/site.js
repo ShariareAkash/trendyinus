@@ -43,6 +43,7 @@
 
   var settings = null;
   var pagesList = [];
+  var categoriesList = [];
 
   /* ---------- utilities ---------- */
   function el(id) { return document.getElementById(id); }
@@ -50,8 +51,16 @@
 
   // Allowlist-based sanitizer for stored rich HTML (article/page bodies) so a
   // malicious <script>, event handler, or javascript: URL can't execute on render.
-  var ALLOWED_TAGS = { P: 1, BR: 1, HR: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, SMALL: 1, MARK: 1, SUB: 1, SUP: 1, BLOCKQUOTE: 1, CITE: 1, UL: 1, OL: 1, LI: 1, A: 1, IMG: 1, FIGURE: 1, FIGCAPTION: 1, TABLE: 1, THEAD: 1, TBODY: 1, TFOOT: 1, TR: 1, TH: 1, TD: 1, CAPTION: 1, COLGROUP: 1, COL: 1, SPAN: 1, DIV: 1, CODE: 1, PRE: 1 };
-  var ALLOWED_ATTRS = { href: 1, src: 1, alt: 1, title: 1, class: 1, colspan: 1, rowspan: 1, target: 1, rel: 1, width: 1, height: 1 };
+  var ALLOWED_TAGS = { P: 1, BR: 1, HR: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, SMALL: 1, MARK: 1, SUB: 1, SUP: 1, BLOCKQUOTE: 1, CITE: 1, UL: 1, OL: 1, LI: 1, A: 1, IMG: 1, FIGURE: 1, FIGCAPTION: 1, TABLE: 1, THEAD: 1, TBODY: 1, TFOOT: 1, TR: 1, TH: 1, TD: 1, CAPTION: 1, COLGROUP: 1, COL: 1, SPAN: 1, DIV: 1, CODE: 1, PRE: 1, IFRAME: 1 };
+  var ALLOWED_ATTRS = {
+    href: 1, src: 1, alt: 1, title: 1, class: 1, colspan: 1, rowspan: 1, target: 1, rel: 1, width: 1, height: 1,
+    // embed support (YouTube iframe + Instagram/X blockquotes)
+    allow: 1, allowfullscreen: 1, allowtransparency: 1, frameborder: 1, loading: 1, referrerpolicy: 1, style: 1,
+    cite: 1, lang: 1, dir: 1, 'data-instgrm-permalink': 1, 'data-instgrm-version': 1, 'data-instgrm-captioned': 1,
+    'data-theme': 1, 'data-lang': 1, 'data-dnt': 1, 'data-width': 1, 'data-conversation': 1, 'data-media-max-width': 1
+  };
+  // Only these hosts may be framed — never allow an arbitrary iframe src.
+  var IFRAME_HOSTS = /^(www\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be|player\.vimeo\.com)$/i;
   function sanitizeHTML(html) {
     var doc = new DOMParser().parseFromString('<div id="__root">' + (html || '') + '</div>', 'text/html');
     var root = doc.getElementById('__root');
@@ -60,6 +69,11 @@
         if (n.nodeType === 8) { n.parentNode.removeChild(n); return; } // comments
         if (n.nodeType !== 1) return;                                   // keep text nodes
         if (!ALLOWED_TAGS[n.tagName]) { n.parentNode.removeChild(n); return; }
+        if (n.tagName === 'IFRAME') {
+          var host = '';
+          try { host = new URL(n.getAttribute('src') || '', location.href).hostname; } catch (e) { host = ''; }
+          if (!IFRAME_HOSTS.test(host)) { n.parentNode.removeChild(n); return; } // drop untrusted frames
+        }
         Array.prototype.slice.call(n.attributes).forEach(function (a) {
           var name = a.name.toLowerCase(), val = String(a.value || '').trim();
           if (!ALLOWED_ATTRS[name]) { n.removeAttribute(a.name); return; }
@@ -70,9 +84,34 @@
     })(root);
     return root.innerHTML;
   }
+
+  /* ---------- embeds (X / Instagram need their platform script to upgrade the blockquote) ---------- */
+  function loadScriptOnce(src, id) {
+    return new Promise(function (res) {
+      if (document.getElementById(id)) { res(); return; }
+      var s = document.createElement('script');
+      s.id = id; s.async = true; s.src = src;
+      s.onload = function () { res(); };
+      s.onerror = function () { res(); };
+      document.head.appendChild(s);
+    });
+  }
+  function loadEmbeds(container) {
+    if (!container) return;
+    if (container.querySelector('blockquote.twitter-tweet')) {
+      loadScriptOnce('https://platform.twitter.com/widgets.js', 'ti-tw-widgets').then(function () {
+        if (window.twttr && window.twttr.widgets) window.twttr.widgets.load(container);
+      });
+    }
+    if (container.querySelector('blockquote.instagram-media')) {
+      loadScriptOnce('https://www.instagram.com/embed.js', 'ti-ig-embed').then(function () {
+        if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
+      });
+    }
+  }
   function api(p) { return fetch(p, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }); }
   function qs(name) { return new URLSearchParams(location.search).get(name); }
-  function articleHref(p) { return 'article.html?id=' + p.id; }
+  function articleHref(p) { return (p && p.slug) ? '/' + encodeURIComponent(p.slug) : 'article.html?id=' + p.id; }
   function timeAgo(iso) {
     var d = new Date(iso), s = (Date.now() - d.getTime()) / 1000;
     if (s < 3600) return Math.max(1, Math.round(s / 60)) + 'm ago';
@@ -81,6 +120,19 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
   function fullDate(iso) { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+
+  // A single extensionless path segment (e.g. /red-sox-vs-rays) is treated as an article slug.
+  function slugFromPath() {
+    var p = location.pathname.replace(/^\/+|\/+$/g, '');
+    if (!p || p.indexOf('/') !== -1 || /\.[a-z0-9]+$/i.test(p)) return '';
+    return decodeURIComponent(p);
+  }
+  function setMeta(name, content) {
+    if (!content) return;
+    var m = document.querySelector('meta[name="' + name + '"]');
+    if (!m) { m = document.createElement('meta'); m.setAttribute('name', name); document.head.appendChild(m); }
+    m.setAttribute('content', content);
+  }
 
   /* ---------- theme ---------- */
   function applyTheme(t) {
@@ -108,13 +160,13 @@
         '<div class="flex justify-between items-center h-20 px-gutter max-w-container-max mx-auto gap-4">' +
           '<div class="flex items-center gap-gutter">' +
             '<button id="mobileMenuBtn" class="md:hidden p-2 text-on-background"><span class="material-symbols-outlined">menu</span></button>' +
-            '<a href="index.html" class="flex items-center shrink-0" title="' + esc(name) + '"><img src="' + esc(settings.logo || '/assets/logo.svg') + '" alt="' + esc(name) + '" class="w-auto" style="height:' + (parseInt(settings.logoHeight, 10) || 44) + 'px"/></a>' +
+            '<a href="index.html" class="flex items-center shrink-0" title="' + esc(name) + '"><img src="' + esc(settings.logo || '/assets/logo.svg') + '" alt="' + esc(name) + '" class="w-auto max-h-10 sm:max-h-16" style="height:' + (parseInt(settings.logoHeight, 10) || 44) + 'px"/></a>' +
           '</div>' +
           '<div class="flex items-center gap-6">' +
             '<nav class="hidden md:flex gap-5 lg:gap-7 items-center">' + links + '</nav>' +
             '<div class="hidden lg:flex items-center bg-surface-container rounded-full px-4 py-2 border border-outline-variant">' +
               '<span class="material-symbols-outlined text-on-surface-variant text-sm mr-2">search</span>' +
-              '<input id="searchInput" class="bg-transparent border-none focus:ring-0 text-label-sm text-on-surface placeholder:text-on-surface-variant w-40" placeholder="Search football news..." type="text"/>' +
+              '<input id="searchInput" class="bg-transparent border-none focus:ring-0 text-label-sm text-on-surface placeholder:text-on-surface-variant w-40" placeholder="Search news..." type="text"/>' +
             '</div>' +
             '<button id="themeToggle" title="Toggle theme" class="w-10 h-10 flex items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">dark_mode</span></button>' +
           '</div>' +
@@ -139,7 +191,6 @@
       '<aside class="hidden lg:flex fixed left-6 top-1/2 -translate-y-1/2 flex-col gap-stack-md z-40 bg-card/90 backdrop-blur-md p-3 rounded-full border border-outline-variant shadow-xl">' +
         item('index.html', 'home', 'Home', active === 'home') +
         item('live-scores.html', 'sports_soccer', 'Live Scores', active === 'live-scores') +
-        item('world-cup.html', 'emoji_events', 'World Cup Hub', active === 'world-cup') +
         item('admin.html', 'settings', 'Admin', false) +
       '</aside>';
   }
@@ -167,7 +218,7 @@
             (pagesCol.length ? col('Information', pagesCol) : '') +
           '</div>' +
           '<div class="border-t border-outline-variant pt-stack-md mt-stack-md flex flex-col md:flex-row justify-between items-center gap-4">' +
-            '<p class="text-on-surface-variant font-label-sm">&copy; ' + year + ' ' + esc(name) + '. All Rights Reserved. FIFA World Cup Coverage.</p>' +
+            '<p class="text-on-surface-variant font-label-sm">&copy; ' + year + ' ' + esc(name) + '. All Rights Reserved.</p>' +
             (bottomLinks ? '<div class="flex gap-stack-md flex-wrap">' + bottomLinks + '</div>' : '') +
           '</div>' +
         '</div>' +
@@ -179,7 +230,6 @@
     return '<a href="' + articleHref(p) + '" class="group relative overflow-hidden rounded-xl bg-card border border-outline-variant block h-full fadein">' +
       '<div class="relative aspect-video lg:aspect-auto lg:h-[600px] overflow-hidden"><img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="' + esc(p.image) + '" alt=""/><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div></div>' +
       '<div class="absolute bottom-0 left-0 p-stack-lg w-full">' +
-        '<div class="flex items-center gap-3 mb-4"><img class="w-10 h-10 rounded-full border border-primary object-cover" src="' + esc(p.authorAvatar) + '" alt=""/><div><p class="text-label-sm font-bold text-white">' + esc(p.author) + '</p><p class="text-[10px] text-white/70 uppercase tracking-widest">' + esc(p.authorRole || '') + '</p></div></div>' +
         '<h1 class="font-headline-xl text-headline-xl text-white mb-4 group-hover:text-primary transition-colors">' + esc(p.title) + '</h1>' +
         '<div class="flex items-center gap-4"><span class="text-primary font-bold text-label-sm">' + esc(p.category) + '</span><span class="text-white/70 text-label-sm">&bull; ' + p.readTime + ' minute read</span></div>' +
       '</div></a>';
@@ -197,7 +247,7 @@
   function newsCard(p) {
     return '<a href="' + articleHref(p) + '" class="group bento-card block bg-card rounded-xl overflow-hidden border border-outline-variant hover:shadow-lg transition-all duration-300 fadein">' +
       '<div class="h-48 overflow-hidden"><img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="' + esc(p.image) + '" alt=""/></div>' +
-      '<div class="p-4"><div class="flex items-center gap-2 mb-3"><img class="w-6 h-6 rounded-full object-cover" src="' + esc(p.authorAvatar) + '" alt=""/><span class="text-[10px] text-on-surface-variant font-bold uppercase">' + esc(p.author) + ' &bull; ' + timeAgo(p.date) + '</span></div>' +
+      '<div class="p-4"><div class="flex items-center gap-2 mb-3"><span class="text-[10px] text-on-surface-variant font-bold uppercase">' + timeAgo(p.date) + '</span></div>' +
       '<h4 class="font-headline-md text-on-surface mb-3 group-hover:text-primary transition-colors">' + esc(p.title) + '</h4>' +
       '<span class="text-primary font-bold text-label-sm">' + esc(p.category) + ' | ' + p.readTime + ' min read</span></div></a>';
   }
@@ -205,7 +255,7 @@
     return '<a href="' + articleHref(p) + '" class="flex gap-4 group cursor-pointer block fadein"><div class="flex-grow"><h4 class="font-body-md font-bold text-on-surface group-hover:text-primary transition-colors leading-tight mb-2">' + esc(p.title) + '</h4><div class="flex gap-3 font-label-sm text-xs text-on-surface-variant"><span class="text-primary font-bold">' + esc(p.category) + '</span><span>' + p.readTime + ' min read</span></div></div><div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-outline-variant"><img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="' + esc(p.image) + '" alt=""/></div></a>';
   }
   function moreCard(p) {
-    return '<a href="' + articleHref(p) + '" class="group cursor-pointer block fadein"><div class="aspect-[4/3] rounded-xl overflow-hidden border border-outline-variant mb-3 relative shadow-sm"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="' + esc(p.image) + '" alt=""/><div class="absolute top-3 left-3 bg-card/90 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-primary uppercase tracking-widest border border-outline-variant">' + esc(p.category) + '</div></div><h4 class="font-body-md font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-2 mb-2">' + esc(p.title) + '</h4><div class="flex items-center gap-3"><img class="w-6 h-6 rounded-full border border-outline-variant object-cover" src="' + esc(p.authorAvatar) + '" alt=""/><span class="font-label-sm text-[11px] text-on-surface-variant">' + esc(p.author) + ' &bull; ' + p.readTime + ' min read</span></div></a>';
+    return '<a href="' + articleHref(p) + '" class="group cursor-pointer block fadein"><div class="aspect-[4/3] rounded-xl overflow-hidden border border-outline-variant mb-3 relative shadow-sm"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="' + esc(p.image) + '" alt=""/><div class="absolute top-3 left-3 bg-card/90 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-primary uppercase tracking-widest border border-outline-variant">' + esc(p.category) + '</div></div><h4 class="font-body-md font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-2 mb-2">' + esc(p.title) + '</h4><div class="flex items-center gap-3"><span class="font-label-sm text-[11px] text-on-surface-variant">' + timeAgo(p.date) + ' &bull; ' + p.readTime + ' min read</span></div></a>';
   }
 
   /* ---------- breaking bar ---------- */
@@ -266,7 +316,10 @@
 
   function renderArticle(posts) {
     var id = parseInt(qs('id'), 10);
-    var post = posts.filter(function (p) { return p.id === id; })[0] || posts.filter(function (p) { return p.section === 'leagues'; })[0] || posts[0];
+    var slug = slugFromPath();
+    var post = null;
+    if (slug) post = posts.filter(function (p) { return p.slug === slug; })[0];
+    if (!post && id) post = posts.filter(function (p) { return p.id === id; })[0];
     var set = function (idn, html) { var n = el(idn); if (n) n.innerHTML = html; };
     if (!post) {
       if (el('a-title')) el('a-title').textContent = 'Article not found';
@@ -274,30 +327,40 @@
       return;
     }
     document.title = post.title + ' — ' + settings.siteName;
+    setMeta('description', post.excerpt || '');
     set('a-category', esc(post.category));
     set('a-meta', post.readTime + ' minute read &nbsp;&bull;&nbsp; ' + fullDate(post.date));
     set('a-title', esc(post.title));
-    var img = el('a-image'); if (img) img.src = post.image;
-    set('a-caption', esc(post.caption || (post.author + ' reports for TrendyinUS.')));
-    var av = el('a-avatar'); if (av) av.src = post.authorAvatar;
-    set('a-author', esc(post.author));
-    set('a-author-role', esc(post.authorRole || 'TrendyinUS'));
+    var img = el('a-image');
+    if (img) { img.src = post.image; img.alt = post.imageAlt || post.title; img.title = post.imageTitle || post.imageAlt || post.title; }
+    set('a-caption', esc(post.caption || ''));
     set('a-body', sanitizeHTML(post.body || ('<p>' + esc(post.excerpt) + '</p>')));
-    var tags = (post.tags && post.tags.length) ? post.tags : ['#' + post.section, '#Football'];
+    loadEmbeds(el('a-body'));
+    var tags = (post.tags && post.tags.length) ? post.tags : [];
     set('a-tags', tags.map(function (t) { return '<span class="bg-surface-container px-3 py-1 rounded font-label-sm text-on-surface-variant">' + esc(t) + '</span>'; }).join(''));
 
-    // live match widget
-    var lm = settings.liveMatch || {};
-    set('a-live-home', esc(lm.home || '')); set('a-live-away', esc(lm.away || ''));
-    set('a-live-home-score', esc(lm.homeScore || '')); set('a-live-away-score', esc(lm.awayScore || ''));
-    set('a-live-status', esc(lm.status || ''));
+    // sidebar: categories
+    set('a-categories', (categoriesList || []).map(function (c) {
+      return '<li><a class="inline-block px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant text-on-surface hover:bg-primary-container hover:text-on-primary-container font-label-sm transition-colors lg:w-full" href="' + esc(c.slug) + '.html">' + esc(c.name) + '</a></li>';
+    }).join(''));
 
-    // trending + more
-    var trending = posts.filter(function (p) { return p.trending && p.id !== post.id; }).slice(0, 3);
-    if (trending.length < 3) trending = posts.filter(function (p) { return p.id !== post.id; }).slice(0, 3);
-    set('a-trending', trending.map(trendingItem).join(''));
-    var more = posts.filter(function (p) { return p.id !== post.id; }).slice(0, 4);
-    set('a-more', more.map(moreCard).join(''));
+    // sidebar: latest articles
+    var latest = posts.filter(function (p) { return p.id !== post.id; }).slice(0, 5);
+    set('a-latest', latest.length ? latest.map(trendingItem).join('') : '<p class="text-on-surface-variant font-label-sm">Nothing else yet.</p>');
+
+    // bottom: 3 similar articles from the same category (topped up with recent if short)
+    var cats = (post.categories && post.categories.length) ? post.categories : [post.category];
+    var similar = posts.filter(function (p) {
+      if (p.id === post.id) return false;
+      var pc = (p.categories && p.categories.length) ? p.categories : [p.category];
+      for (var i = 0; i < pc.length; i++) { if (cats.indexOf(pc[i]) !== -1) return true; }
+      return false;
+    }).slice(0, 3);
+    if (similar.length < 3) {
+      posts.filter(function (p) { return p.id !== post.id && similar.indexOf(p) === -1; })
+           .slice(0, 3 - similar.length).forEach(function (p) { similar.push(p); });
+    }
+    set('a-similar', similar.length ? similar.map(moreCard).join('') : '<p class="text-on-surface-variant col-span-full font-body-md">No similar articles yet.</p>');
   }
 
   function renderStatic(slug) {
@@ -367,10 +430,16 @@
     }).catch(function () {}).then(function () { lsLoading = false; });
   }
 
-  function injectFavicon() {
-    if (document.querySelector('link[rel="icon"]')) return;
+  function applyFavicon(href) {
+    var url = href || '/assets/favicon.svg';
+    Array.prototype.slice.call(document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]'))
+      .forEach(function (l) { l.parentNode.removeChild(l); });
     var l = document.createElement('link');
-    l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = '/assets/favicon.svg';
+    l.rel = 'icon';
+    if (/\.svg(\?|$)/i.test(url)) l.type = 'image/svg+xml';
+    else if (/\.png(\?|$)/i.test(url)) l.type = 'image/png';
+    else if (/\.ico(\?|$)/i.test(url)) l.type = 'image/x-icon';
+    l.href = url;
     document.head.appendChild(l);
   }
 
@@ -381,12 +450,12 @@
 
   /* ---------- boot ---------- */
   document.addEventListener('DOMContentLoaded', function () {
-    injectFavicon();
     var page = window.TI_PAGE || { type: 'home' };
-    Promise.all([api('/api/settings'), api('/api/pages').catch(function () { return []; })]).then(function (r) {
+    Promise.all([api('/api/settings'), api('/api/pages').catch(function () { return []; }), api('/api/categories').catch(function () { return []; })]).then(function (r) {
       settings = r[0] || {};
       pagesList = r[1] || [];
-      if (settings.favicon) { var fav = document.querySelector('link[rel="icon"]'); if (fav) { fav.href = settings.favicon; fav.type = /\.svg$/i.test(settings.favicon) ? 'image/svg+xml' : ''; } }
+      categoriesList = r[2] || [];
+      applyFavicon(settings.favicon);
       mountHeader(page.active || page.section || (page.type === 'home' ? 'home' : ''));
       mountSideNav(page.active || (page.type === 'home' ? 'home' : page.section) || '');
       mountFooter();

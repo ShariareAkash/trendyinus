@@ -124,7 +124,11 @@
 <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
 <div class="space-y-4">
 <input name="title" required placeholder="Add title" class="w-full bg-card border border-outline-variant rounded-lg px-4 py-3 text-3xl font-headline-md font-bold text-on-surface focus:ring-2 focus:ring-primary outline-none"/>
-<p class="text-xs text-on-surface-variant">Permalink: <span class="text-primary" id="pe-permalink">/article.html?id=(new)</span></p>
+<div class="flex items-center gap-2 flex-wrap text-xs text-on-surface-variant">
+<span>Permalink:</span><span class="text-on-surface-variant">https://trendyinus.com/</span>
+<input name="slug" id="pe-slug" class="flex-1 min-w-[200px] bg-card border border-outline-variant rounded px-2 py-1 text-primary font-mono text-xs" placeholder="auto: first-4-words-of-title"/>
+<button type="button" id="pe-slug-auto" class="text-primary font-bold">Auto</button>
+</div>
 <div class="border border-outline-variant rounded-lg overflow-hidden bg-card">
 <div class="rte-tb" id="rte-toolbar">
 <button type="button" data-cmd="formatBlock" data-val="p" title="Paragraph">P</button>
@@ -146,6 +150,10 @@
 <button type="button" id="rte-link" title="Insert link"><span class="material-symbols-outlined text-[20px]">link</span></button>
 <button type="button" id="rte-image" title="Insert image"><span class="material-symbols-outlined text-[20px]">image</span></button>
 <button type="button" data-cmd="removeFormat" title="Clear formatting"><span class="material-symbols-outlined text-[20px]">format_clear</span></button>
+<span class="sep"></span>
+<button type="button" id="rte-youtube" title="Embed YouTube video"><span class="material-symbols-outlined text-[20px]">smart_display</span></button>
+<button type="button" id="rte-instagram" title="Embed Instagram post"><span class="material-symbols-outlined text-[20px]">photo_camera</span></button>
+<button type="button" id="rte-twitter" title="Embed X (Twitter) post"><span class="material-symbols-outlined text-[20px]">tag</span></button>
 <span class="sep"></span>
 <button type="button" id="rte-code" title="Edit HTML" class="text-xs">&lt;/&gt;</button>
 </div>
@@ -178,7 +186,7 @@
 </div>
 <div class="wp-box"><div class="wp-box-h">Section</div><div class="p-3">
 <select name="section" class="ad-input">
-<option value="news">News</option><option value="transfers">Transfers</option><option value="world-cup">World Cup</option><option value="leagues">Leagues</option><option value="features">Features</option><option value="live-scores">Live Scores</option>
+<option value="news">News</option><option value="soccer">Soccer</option><option value="mlb">MLB</option><option value="nfl">NFL</option><option value="wnba">WNBA</option><option value="tennis">Tennis</option><option value="wwe">WWE</option><option value="others">Others</option>
 </select></div></div>
 <div class="wp-box"><div class="wp-box-h">Categories</div><div class="p-3">
 <div id="cat-checklist" class="max-h-44 overflow-y-auto space-y-1.5 mb-2"></div>
@@ -187,6 +195,8 @@
 <div class="wp-box"><div class="wp-box-h">Featured Image</div><div class="p-3">
 <img id="pe-image-preview" class="w-full h-32 object-cover rounded-lg border border-outline-variant mb-2 hidden"/>
 <input name="image" class="ad-input mb-2" placeholder="Image URL"/>
+<input name="imageAlt" class="ad-input mb-2" placeholder="Alt text (for SEO / screen readers)"/>
+<input name="imageTitle" class="ad-input mb-2" placeholder="Image title (tooltip)"/>
 <label class="cursor-pointer inline-flex items-center gap-1 text-primary text-sm font-bold"><span class="material-symbols-outlined text-[18px]">upload</span>Upload / Set image<input type="file" accept="image/*" class="hidden" data-upload="image"/></label>
 </div></div>
 <div class="wp-box"><div class="wp-box-h">Author</div><div class="p-3 space-y-2">
@@ -308,17 +318,6 @@
 <div class="wp-box"><div class="wp-box-h">Breaking News Ticker</div><div class="p-4 space-y-3">
 <label class="flex items-center gap-2"><input id="breakingEnabled" name="breakingEnabled" type="checkbox" class="w-5 h-5 rounded text-primary"/><span class="text-on-surface font-bold">Show breaking-news ticker</span></label>
 <div><label class="ad-label">Text</label><input name="breaking" class="ad-input"/></div>
-</div></div>
-<div class="wp-box"><div class="wp-box-h">Live Match Widget</div><div class="p-4 grid grid-cols-2 gap-3">
-<div><label class="ad-label">Home Team</label><input name="lm_home" class="ad-input"/></div>
-<div><label class="ad-label">Away Team</label><input name="lm_away" class="ad-input"/></div>
-<div><label class="ad-label">Home Score</label><input name="lm_homeScore" class="ad-input"/></div>
-<div><label class="ad-label">Away Score</label><input name="lm_awayScore" class="ad-input"/></div>
-<div><label class="ad-label">Status / Minute</label><input name="lm_status" class="ad-input" placeholder="78' or 88' - Full Time"/></div>
-<div><label class="ad-label">Competition</label><input name="lm_league" class="ad-input" placeholder="International Friendly"/></div>
-<div><label class="ad-label">Home Scorers (comma separated)</label><input name="lm_homeScorers" class="ad-input" placeholder="Rodrygo 23', Vinícius Jr. 67'"/></div>
-<div><label class="ad-label">Away Scorers (comma separated)</label><input name="lm_awayScorers" class="ad-input" placeholder="L. Martínez 41'"/></div>
-<div class="col-span-2 flex items-center gap-2 pt-1"><input id="lm_live" name="lm_live" type="checkbox" class="w-5 h-5 rounded text-primary"/><label for="lm_live" class="text-on-surface font-bold">Feature as a <span class="text-error">LIVE</span> match on the Live Scores page</label></div>
 </div></div>
 <div class="flex items-center gap-3"><button class="bg-primary text-on-primary px-6 py-3 rounded-lg font-black uppercase tracking-wide hover:brightness-105 active:scale-95 transition">Save Settings</button><span id="settings-saved" class="text-primary font-bold hidden">Saved ✓</span></div>
 </form>

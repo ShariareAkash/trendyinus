@@ -166,11 +166,47 @@
       });
     });
     if (opt.linkBtn) opt.linkBtn.addEventListener('click', function () { var u = prompt('Enter URL', 'https://'); if (u) exec('createLink', u); });
+    function insertImageWithMeta(url) {
+      var alt = prompt('Alt text for this image (SEO / screen readers)', '') || '';
+      var ttl = prompt('Image title (tooltip, optional)', '') || '';
+      insertHTML('<img src="' + escAttr(url) + '" alt="' + escAttr(alt) + '" title="' + escAttr(ttl) + '"/>');
+    }
+    function escAttr(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function insertHTML(html) {
+      bodyEl.focus();
+      if (code) { htmlEl.value += '\n' + html; return; }
+      if (!document.execCommand('insertHTML', false, html)) bodyEl.innerHTML += html;
+    }
     if (opt.imageBtn) opt.imageBtn.addEventListener('click', function () {
       var u = prompt('Image URL (leave blank to upload a file)', '');
       if (u === null) return;
-      if (u.trim()) { exec('insertImage', u.trim()); return; }
-      pickFile(function (file) { uploadFile(file).then(function (url) { bodyEl.focus(); exec('insertImage', url); }); });
+      if (u.trim()) { insertImageWithMeta(u.trim()); return; }
+      pickFile(function (file) { uploadFile(file).then(function (url) { insertImageWithMeta(url); }); });
+    });
+    // ---- embeds ----
+    if (opt.ytBtn) opt.ytBtn.addEventListener('click', function () {
+      var u = prompt('YouTube video URL or ID', 'https://www.youtube.com/watch?v=');
+      if (!u) return;
+      var m = String(u).match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([A-Za-z0-9_-]{6,})/) || String(u).match(/^([A-Za-z0-9_-]{6,})$/);
+      if (!m) { alert('Could not read a YouTube video ID from that.'); return; }
+      insertHTML('<div class="embed-yt"><iframe src="https://www.youtube-nocookie.com/embed/' + escAttr(m[1]) +
+        '" title="YouTube video player" frameborder="0" loading="lazy" allowfullscreen ' +
+        'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div><p><br/></p>');
+    });
+    if (opt.igBtn) opt.igBtn.addEventListener('click', function () {
+      var u = prompt('Instagram post URL', 'https://www.instagram.com/p/');
+      if (!u) return;
+      u = String(u).split('?')[0].replace(/\/$/, '') + '/';
+      if (!/instagram\.com\/(p|reel|tv)\//.test(u)) { alert('That does not look like an Instagram post URL.'); return; }
+      insertHTML('<blockquote class="instagram-media" data-instgrm-permalink="' + escAttr(u) + '" data-instgrm-version="14">' +
+        '<a href="' + escAttr(u) + '">View this post on Instagram</a></blockquote><p><br/></p>');
+    });
+    if (opt.xBtn) opt.xBtn.addEventListener('click', function () {
+      var u = prompt('X (Twitter) post URL', 'https://x.com/');
+      if (!u) return;
+      u = String(u).split('?')[0];
+      if (!/(twitter|x)\.com\/[^/]+\/status\/\d+/.test(u)) { alert('That does not look like an X post URL.'); return; }
+      insertHTML('<blockquote class="twitter-tweet"><a href="' + escAttr(u) + '">' + escAttr(u) + '</a></blockquote><p><br/></p>');
     });
     if (opt.codeBtn) opt.codeBtn.addEventListener('click', function () {
       code = !code;
@@ -191,7 +227,23 @@
 
   /* ---- post editor ---- */
   var postForm = $('#post-form');
-  var bodyRTE = makeRTE($('#rte-body'), $('#rte-html'), $('#rte-toolbar'), { linkBtn: $('#rte-link'), imageBtn: $('#rte-image'), codeBtn: $('#rte-code') });
+  function slugFromTitle(title, n) {
+    return String(title || '').toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ').trim().split(/\s+/).filter(Boolean)
+      .slice(0, n || 4).join('-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+  (function wireSlug() {
+    var auto = document.getElementById('pe-slug-auto');
+    if (auto) auto.addEventListener('click', function () {
+      var f = $('#post-form'); f.slug.value = slugFromTitle(f.title.value, 4);
+    });
+    var t = $('#post-form') && $('#post-form').title;
+    if (t) t.addEventListener('blur', function () {
+      var f = $('#post-form');
+      if (!f.slug.value.trim()) f.slug.value = slugFromTitle(f.title.value, 4);
+    });
+  })();
+  var bodyRTE = makeRTE($('#rte-body'), $('#rte-html'), $('#rte-toolbar'), { linkBtn: $('#rte-link'), imageBtn: $('#rte-image'), codeBtn: $('#rte-code'), ytBtn: $('#rte-youtube'), igBtn: $('#rte-instagram'), xBtn: $('#rte-twitter') });
 
   function renderCatChecklist(selected) {
     selected = selected || [];
@@ -209,7 +261,7 @@
     $('#editor-preview').classList.toggle('hidden', isNew);
     post = post || { section: 'news', readTime: 5, date: new Date().toISOString(), status: 'published', categories: (categories[0] ? [categories[0].name] : []) };
     postForm.id.value = post.id || '';
-    ['title', 'section', 'author', 'authorRole', 'readTime', 'image', 'authorAvatar', 'excerpt', 'caption'].forEach(function (k) { if (postForm[k]) postForm[k].value = post[k] != null ? post[k] : ''; });
+    ['title', 'section', 'author', 'authorRole', 'readTime', 'image', 'authorAvatar', 'excerpt', 'caption', 'slug', 'imageAlt', 'imageTitle'].forEach(function (k) { if (postForm[k]) postForm[k].value = post[k] != null ? post[k] : ''; });
     postForm.status.value = post.status || 'published';
     postForm.tags.value = (post.tags || []).join(', ');
     postForm.date.value = post.date ? new Date(post.date).toISOString().slice(0, 10) : '';
@@ -239,6 +291,7 @@
       status: postForm.status.value,
       author: postForm.author.value, authorRole: postForm.authorRole.value, readTime: postForm.readTime.value,
       image: postForm.image.value, authorAvatar: postForm.authorAvatar.value,
+      slug: postForm.slug.value.trim(), imageAlt: postForm.imageAlt.value, imageTitle: postForm.imageTitle.value,
       excerpt: postForm.excerpt.value, caption: postForm.caption.value, body: bodyRTE.get(),
       tags: postForm.tags.value, date: postForm.date.value ? new Date(postForm.date.value).toISOString() : new Date().toISOString(),
       featured: postForm.featured.checked, highlight: postForm.highlight.checked, trending: postForm.trending.checked
@@ -419,11 +472,6 @@
       var lh = parseInt(s.logoHeight, 10) || 44;
       if (f.logoHeight) { f.logoHeight.value = lh; $('#logoHeight-val').textContent = lh; var szp = $('#logo-size-preview'); if (szp) { szp.style.height = lh + 'px'; szp.src = s.logo || '/assets/logo.svg'; } }
       $('#breakingEnabled').checked = !!s.breakingEnabled;
-      var lm = s.liveMatch || {};
-      f.lm_home.value = lm.home || ''; f.lm_away.value = lm.away || '';
-      f.lm_homeScore.value = lm.homeScore || ''; f.lm_awayScore.value = lm.awayScore || ''; f.lm_status.value = lm.status || '';
-      f.lm_league.value = lm.league || ''; $('#lm_live').checked = !!lm.live;
-      f.lm_homeScorers.value = (lm.homeScorers || []).join(', '); f.lm_awayScorers.value = (lm.awayScorers || []).join(', ');
     });
   }
   $('#settings-form').addEventListener('submit', function (e) {
@@ -433,7 +481,6 @@
       siteName: f.siteName.value, tagline: f.tagline.value, footerAbout: f.footerAbout.value,
       logo: f.logo.value, favicon: f.favicon.value, logoHeight: parseInt(f.logoHeight.value, 10) || 44,
       breaking: f.breaking.value, breakingEnabled: $('#breakingEnabled').checked,
-      liveMatch: { home: f.lm_home.value, away: f.lm_away.value, homeScore: f.lm_homeScore.value, awayScore: f.lm_awayScore.value, status: f.lm_status.value, league: f.lm_league.value, live: $('#lm_live').checked, homeScorers: f.lm_homeScorers.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean), awayScorers: f.lm_awayScorers.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean) }
     }).then(function () { var s = $('#settings-saved'); s.classList.remove('hidden'); setTimeout(function () { s.classList.add('hidden'); }, 2000); }).catch(function (x) { alert('Error: ' + x.message); });
   });
   // Branding uploads (logo / favicon) + live URL preview
@@ -443,6 +490,11 @@
       uploadFile(input.files[0]).then(function (url) {
         var f = input.dataset.supload; $('#settings-form')[f].value = url; setPreview('#' + f + '-preview', url);
         if (f === 'logo') { var szp = $('#logo-size-preview'); if (szp) szp.src = url; }
+        // persist immediately so the upload actually takes effect without a separate save
+        var payload = {}; payload[f] = url;
+        api('PUT', '/api/settings', payload).then(function () {
+          var sv = $('#settings-saved'); if (sv) { sv.classList.remove('hidden'); setTimeout(function () { sv.classList.add('hidden'); }, 2000); }
+        }).catch(function (x) { alert('Saved the file but could not save the setting: ' + x.message); });
       }).catch(function (x) { alert('Upload failed: ' + x.message); });
     });
   });
